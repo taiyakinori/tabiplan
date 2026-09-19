@@ -364,11 +364,11 @@
 
       let multiRouteUrl = null;
       if (daySpots.length >= 2) {
-        const origin = `${daySpots[0].name} ${trip.destination}`;
-        const dest = `${daySpots[daySpots.length - 1].name} ${trip.destination}`;
+        const origin = formatMapQuery(daySpots[0].name, trip.destination);
+        const dest = formatMapQuery(daySpots[daySpots.length - 1].name, trip.destination);
         multiRouteUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
         if (daySpots.length > 2) {
-          const waypoints = daySpots.slice(1, -1).map(s => `${s.name} ${trip.destination}`).join('|');
+          const waypoints = daySpots.slice(1, -1).map(s => formatMapQuery(s.name, trip.destination)).join('|');
           multiRouteUrl += `&waypoints=${encodeURIComponent(waypoints)}`;
         }
       }
@@ -402,9 +402,9 @@
         html += `<div class="space-y-2.5">`;
         daySpots.forEach((spot, idx) => {
           const nextSpot = daySpots[idx + 1];
-          const navCurrentUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${spot.name} ${trip.destination}`)}`;
-          const navNextUrl = nextSpot ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(`${spot.name} ${trip.destination}`)}&destination=${encodeURIComponent(`${nextSpot.name} ${trip.destination}`)}` : null;
-          const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${spot.name} ${trip.destination}`)}`;
+          const navCurrentUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(formatMapQuery(spot.name, trip.destination))}`;
+          const navNextUrl = nextSpot ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(formatMapQuery(spot.name, trip.destination))}&destination=${encodeURIComponent(formatMapQuery(nextSpot.name, trip.destination))}` : null;
+          const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(spot.name)}`;
 
           html += `
             <div class="bg-slate-50/90 rounded-xl p-3 border border-slate-200">
@@ -1151,6 +1151,12 @@
         case 'transit': return '交通';
         default: return '観光';
       }
+    }
+
+    function formatMapQuery(spotName, destination) {
+      if (!spotName) return '';
+      if (!destination || spotName.includes(destination)) return spotName;
+      return `${spotName} ${destination}`;
     }
 
     function escapeHtml(str) {
