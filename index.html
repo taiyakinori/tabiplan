@@ -26,7 +26,7 @@
         <div>
           <div class="flex items-center gap-1.5">
             <h1 class="font-black text-sm tracking-tight text-slate-800 leading-none">TabiPlan</h1>
-            <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold">v3.1（完全単体検索版）</span>
+            <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold">v4.0（移動手段切替：車・電車対応版）</span>
           </div>
           <span class="text-[10px] text-slate-400 font-medium">旅程・マップ・割り勘精算</span>
         </div>
@@ -45,6 +45,14 @@
   <script>
     // --- Preset Cities Data ---
     const PRESETS = {
+      '福井': [
+        { name: '東京駅', category: 'transit', duration: 10, cost: 0, memo: '東海道新幹線で名古屋へ', travel_mode: 'transit' },
+        { name: '名古屋駅', category: 'transit', duration: 20, cost: 0, memo: '特急しらさぎに乗換', travel_mode: 'transit' },
+        { name: '敦賀駅', category: 'transit', duration: 30, cost: 0, memo: 'レンタカー受取・ドライブ出発', travel_mode: 'driving' },
+        { name: '東尋坊', category: 'sightseeing', duration: 90, cost: 500, memo: '日本海の断崖絶壁と海鮮ランチ', travel_mode: 'driving' },
+        { name: '福井駅', category: 'transit', duration: 60, cost: 0, memo: '駅前恐竜広場・お土産購入', travel_mode: 'driving' }
+      ],
+
       '京都': [
         { name: '清水寺', category: 'sightseeing', duration: 90, cost: 400, memo: '舞台からの眺望と音羽の滝' },
         { name: '錦市場', category: 'food', duration: 60, cost: 2000, memo: '京都の台所で食べ歩きランチ' },
@@ -361,19 +369,22 @@
       }
       html += `</div>`;
 
-      // 1-Day Multi-stop Route Link
+      // 1-Day Multi-stop Route URLs (Car vs Transit)
       const dayDuration = daySpots.reduce((s, spot) => s + (spot.duration_min || 0), 0);
       const dayEstimate = daySpots.reduce((s, spot) => s + (spot.cost_estimate || 0), 0);
 
-      let multiRouteUrl = null;
+      let multiRouteCarUrl = null;
+      let multiRouteTransitUrl = null;
       if (daySpots.length >= 2) {
-        const origin = daySpots[0].name;
-        const dest = daySpots[daySpots.length - 1].name;
-        multiRouteUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
+        const origin = daySpots[0].name.trim();
+        const dest = daySpots[daySpots.length - 1].name.trim();
+        let wpParam = '';
         if (daySpots.length > 2) {
-          const waypoints = daySpots.slice(1, -1).map(s => s.name).join('|');
-          multiRouteUrl += `&waypoints=${encodeURIComponent(waypoints)}`;
+          const waypoints = daySpots.slice(1, -1).map(s => s.name.trim()).join('|');
+          wpParam = `&waypoints=${encodeURIComponent(waypoints)}`;
         }
+        multiRouteCarUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}${wpParam}&travelmode=driving`;
+        multiRouteTransitUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}${wpParam}&travelmode=transit`;
       }
 
       html += `
@@ -382,13 +393,19 @@
             <span><strong>${activeDay}日目</strong>: スポット ${daySpots.length}件 (滞在約${dayDuration}分)</span>
             ${dayEstimate > 0 ? `<span class="font-bold text-emerald-700">予定: ¥${dayEstimate.toLocaleString()}</span>` : ''}
           </div>
-          ${multiRouteUrl ? `
-            <a href="${multiRouteUrl}" target="_blank" rel="noopener" class="w-full py-2 px-3 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
-              <i data-lucide="route" class="w-3.5 h-3.5"></i> ${activeDay}日目の巡回ルートを一括でGoogleマップで開く
-              <i data-lucide="external-link" class="w-3 h-3"></i>
-            </a>
+          ${multiRouteCarUrl ? `
+            <div class="grid grid-cols-2 gap-2 mt-1">
+              <a href="${multiRouteCarUrl}" target="_blank" rel="noopener" class="py-2 px-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow-xs transition-colors">
+                <i data-lucide="car" class="w-3.5 h-3.5"></i> 車で全ルート開く
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+              <a href="${multiRouteTransitUrl}" target="_blank" rel="noopener" class="py-2 px-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow-xs transition-colors">
+                <i data-lucide="train" class="w-3.5 h-3.5"></i> 電車でルート開く
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
           ` : `
-            <div class="text-[11px] text-slate-400 text-center">2箇所以上の登録で、巡回ルートを一発でGoogleマップに展開できます</div>
+            <div class="text-[11px] text-slate-400 text-center">2箇所以上の登録で、1日の巡回ルートを一発でGoogleマップに展開できます</div>
           `}
         </div>
       `;
@@ -402,14 +419,14 @@
           </div>
         `;
       } else {
-        html += `<div class="space-y-2.5">`;
+        html += `<div class="space-y-3">`;
         daySpots.forEach((spot, idx) => {
           const nextSpot = daySpots[idx + 1];
-          // Google Maps URLs: strictly using spot.name ONLY (never appending destination)
           const cleanSpotName = spot.name.trim();
           const cleanNextSpotName = nextSpot ? nextSpot.name.trim() : '';
-          const navCurrentUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(cleanSpotName)}`;
-          const navNextUrl = nextSpot ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(cleanSpotName)}&destination=${encodeURIComponent(cleanNextSpotName)}` : null;
+          const spotMode = spot.travel_mode || (spot.category === 'transit' ? 'transit' : 'driving');
+
+          const navCurrentUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(cleanSpotName)}&travelmode=${spotMode}`;
           const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanSpotName)}`;
 
           html += `
@@ -430,15 +447,10 @@
                   </div>
 
                   <!-- Google Maps Action Buttons -->
-                  <div class="flex flex-wrap items-center gap-1 pt-1.5 border-t border-slate-200/60">
+                  <div class="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-slate-200/60">
                     <a href="${navCurrentUrl}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-md text-[11px] font-bold shadow-2xs">
-                      <i data-lucide="navigation" class="w-3 h-3"></i> 現在地からナビ
+                      <i data-lucide="navigation" class="w-3 h-3"></i> 現在地からナビ(${spotMode === 'driving' ? '車' : spotMode === 'walking' ? '徒歩' : '電車'})
                     </a>
-                    ${navNextUrl ? `
-                      <a href="${navNextUrl}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 px-2 py-1 bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 rounded-md text-[11px] font-medium">
-                        <i data-lucide="arrow-right" class="w-3 h-3 text-sky-500"></i> 次へ
-                      </a>
-                    ` : ''}
                     <a href="${searchUrl}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 px-2 py-1 bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 rounded-md text-[11px]">
                       詳細 <i data-lucide="external-link" class="w-2.5 h-2.5"></i>
                     </a>
@@ -463,6 +475,45 @@
               </div>
             </div>
           `;
+
+          // If there is a next spot, render a dedicated transit segment connecting this spot to nextSpot!
+          if (nextSpot) {
+            const nextMode = spot.travel_mode || 'transit';
+            const navNextUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(cleanSpotName)}&destination=${encodeURIComponent(cleanNextSpotName)}&travelmode=${nextMode}`;
+
+            let modeBadgeStyle = 'bg-blue-50 text-blue-900 border-blue-200 hover:bg-blue-100';
+            let modeIcon = '<i data-lucide="train" class="w-3.5 h-3.5 text-blue-600"></i>';
+            let modeName = '🚆 電車';
+            let modeLabel = '乗換案内';
+
+            if (nextMode === 'driving') {
+              modeBadgeStyle = 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100';
+              modeIcon = '<i data-lucide="car" class="w-3.5 h-3.5 text-amber-600"></i>';
+              modeName = '🚗 車・レンタカー';
+              modeLabel = '車ナビ';
+            } else if (nextMode === 'walking') {
+              modeBadgeStyle = 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100';
+              modeIcon = '<i data-lucide="footprints" class="w-3.5 h-3.5 text-emerald-600"></i>';
+              modeName = '🚶 徒歩';
+              modeLabel = '徒歩ルート';
+            }
+
+            html += `
+              <div class="my-1.5 flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200 shadow-2xs text-xs">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[10px] text-slate-400 font-bold">区間移動:</span>
+                  <button onclick="toggleSpotTravelMode('${spot.id}')" class="px-2 py-0.5 rounded-md text-[11px] font-bold flex items-center gap-1 border transition-all ${modeBadgeStyle}" title="タップして移動手段（電車/車/徒歩）を切替">
+                    ${modeIcon} <span>${modeName}</span>
+                    <span class="text-[9px] text-slate-400">▼</span>
+                  </button>
+                </div>
+                <a href="${navNextUrl}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-lg text-[11px] font-bold transition-colors">
+                  <span>${cleanSpotName} ➔ ${cleanNextSpotName}（${modeLabel}）</span>
+                  <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                </a>
+              </div>
+            `;
+          }
         });
         html += `</div>`;
       }
@@ -477,7 +528,6 @@
       return html;
     }
 
-    // --- 2-B. Warikan & Expenses Tab ---
     function renderWarikanTab(trip, members, expenses, totalExpense, totalBudget, budgetDiff) {
       const itemizedLendings = calculateItemizedLendings(expenses, members);
       const settlements = calculateOptimalSettlements(expenses, members);
@@ -864,6 +914,15 @@
               </div>
             </div>
 
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">次のスポットへの移動手段</label>
+              <select id="spot-travel-mode" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
+                <option value="transit">🚆 電車・新幹線・公共交通</option>
+                <option value="driving">🚗 自動車・レンタカー</option>
+                <option value="walking">🚶 徒歩</option>
+              </select>
+            </div>
+
             <div class="flex gap-2 pt-2">
               <button type="button" onclick="closeModal()" class="flex-1 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200">
                 キャンセル
@@ -885,6 +944,7 @@
       const memo = document.getElementById('spot-memo').value.trim();
       const duration = parseInt(document.getElementById('spot-duration').value, 10) || 60;
       const cost = parseInt(document.getElementById('spot-cost').value, 10) || 0;
+      const travelMode = document.getElementById('spot-travel-mode')?.value || (category === 'transit' ? 'transit' : 'driving');
 
       if (!name) return;
       const data = getTripData(currentTripId);
@@ -898,7 +958,8 @@
         category,
         memo,
         duration_min: duration,
-        cost_estimate: cost
+        cost_estimate: cost,
+        travel_mode: travelMode
       };
       data.spots.push(newSpot);
       saveTripData(currentTripId, data);
@@ -917,6 +978,21 @@
     }
     function setWarikanSubTab(subTab) {
       warikanSubTab = subTab;
+      render();
+    }
+
+    // Toggle Travel Mode between spots (transit -> driving -> walking -> transit)
+    function toggleSpotTravelMode(spotId) {
+      const data = getTripData(currentTripId);
+      const spot = data.spots.find(s => s.id === spotId);
+      if (!spot) return;
+
+      const current = spot.travel_mode || 'transit';
+      if (current === 'transit') spot.travel_mode = 'driving';
+      else if (current === 'driving') spot.travel_mode = 'walking';
+      else spot.travel_mode = 'transit';
+
+      saveTripData(currentTripId, data);
       render();
     }
 
@@ -1013,7 +1089,8 @@
           category: s.category,
           memo: s.memo,
           duration_min: s.duration,
-          cost_estimate: s.cost
+          cost_estimate: s.cost,
+          travel_mode: s.travel_mode || 'transit'
         }));
       }
 
