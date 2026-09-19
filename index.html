@@ -24,7 +24,10 @@
           <i data-lucide="compass" class="w-5 h-5"></i>
         </div>
         <div>
-          <h1 class="font-black text-sm tracking-tight text-slate-800 leading-none">TabiPlan</h1>
+          <div class="flex items-center gap-1.5">
+            <h1 class="font-black text-sm tracking-tight text-slate-800 leading-none">TabiPlan</h1>
+            <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold">v3.1（完全単体検索版）</span>
+          </div>
           <span class="text-[10px] text-slate-400 font-medium">旅程・マップ・割り勘精算</span>
         </div>
       </div>
@@ -364,11 +367,11 @@
 
       let multiRouteUrl = null;
       if (daySpots.length >= 2) {
-        const origin = formatMapQuery(daySpots[0].name, trip.destination);
-        const dest = formatMapQuery(daySpots[daySpots.length - 1].name, trip.destination);
+        const origin = daySpots[0].name;
+        const dest = daySpots[daySpots.length - 1].name;
         multiRouteUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
         if (daySpots.length > 2) {
-          const waypoints = daySpots.slice(1, -1).map(s => formatMapQuery(s.name, trip.destination)).join('|');
+          const waypoints = daySpots.slice(1, -1).map(s => s.name).join('|');
           multiRouteUrl += `&waypoints=${encodeURIComponent(waypoints)}`;
         }
       }
@@ -402,9 +405,12 @@
         html += `<div class="space-y-2.5">`;
         daySpots.forEach((spot, idx) => {
           const nextSpot = daySpots[idx + 1];
-          const navCurrentUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(formatMapQuery(spot.name, trip.destination))}`;
-          const navNextUrl = nextSpot ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(formatMapQuery(spot.name, trip.destination))}&destination=${encodeURIComponent(formatMapQuery(nextSpot.name, trip.destination))}` : null;
-          const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(spot.name)}`;
+          // Google Maps URLs: strictly using spot.name ONLY (never appending destination)
+          const cleanSpotName = spot.name.trim();
+          const cleanNextSpotName = nextSpot ? nextSpot.name.trim() : '';
+          const navCurrentUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(cleanSpotName)}`;
+          const navNextUrl = nextSpot ? `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(cleanSpotName)}&destination=${encodeURIComponent(cleanNextSpotName)}` : null;
+          const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanSpotName)}`;
 
           html += `
             <div class="bg-slate-50/90 rounded-xl p-3 border border-slate-200">
