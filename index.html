@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TabiPlan - 旅程・Googleマップ連携・支出割り勘管理</title>
+  <title>TabiPlan - 旅程・Googleマップ連携・割り勘管理</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons CDN -->
@@ -25,15 +25,18 @@
         </div>
         <div>
           <h1 class="font-black text-sm tracking-tight text-slate-800 leading-none">TabiPlan</h1>
-          <span class="text-[10px] text-slate-400 font-medium">旅行・マップ・支出管理</span>
+          <span class="text-[10px] text-slate-400 font-medium">旅程・マップ・割り勘精算</span>
         </div>
       </div>
-      <div id="header-actions" class="flex items-center gap-1"></div>
+      <div id="header-actions" class="flex items-center gap-1.5"></div>
     </header>
 
     <!-- Main Content Area -->
     <main id="main-content" class="flex-1 p-4"></main>
   </div>
+
+  <!-- Global Modal Container -->
+  <div id="modal-container" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"></div>
 
   <!-- App Script -->
   <script>
@@ -73,7 +76,11 @@
     let currentView = 'home';
     let currentTripId = null;
     let activeDay = 1;
-    let activeTab = 'timeline'; // 'timeline' | 'expenses' | 'lendings' | 'settlement'
+    let activeTab = 'timeline'; // 'timeline' | 'warikan'
+    let warikanSubTab = 'expenses'; // 'expenses' | 'lendings' | 'settlement' | 'members'
+
+    // Form Temporary Members State (For Creation Screen)
+    let creationMembers = ['自分', '彼女'];
 
     // LocalStorage Helper
     function getStoredTrips() {
@@ -104,6 +111,7 @@
     function navigate(view, tripId = null) {
       currentView = view;
       if (tripId) currentTripId = tripId;
+      closeModal();
       render();
     }
 
@@ -126,8 +134,8 @@
       const trips = getStoredTrips();
       let html = `
         <div class="mb-5 text-center pt-2">
-          <h2 class="text-lg font-black text-slate-800">旅行計画・支出マネージャー</h2>
-          <p class="text-xs text-slate-500 mt-1">iPad・スマホで即座に動作するローカル完結ツール</p>
+          <h2 class="text-lg font-black text-slate-800">旅行計画・割り勘マネージャー</h2>
+          <p class="text-xs text-slate-500 mt-0.5">誰が・誰の・何を支払ったかをスマートに管理</p>
         </div>
       `;
 
@@ -136,13 +144,13 @@
           <div class="mb-5">
             <h3 class="text-xs font-bold text-slate-600 mb-2 flex items-center gap-1.5">
               <i data-lucide="folder-kanban" class="w-3.5 h-3.5 text-sky-500"></i>
-              保存済みの旅行 (${trips.length}件)
+              保存済みの旅行プラン (${trips.length}件)
             </h3>
             <div class="space-y-2">
         `;
         trips.forEach(t => {
           html += `
-            <div onclick="navigate('detail', '${t.id}')" class="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:border-sky-300 cursor-pointer flex items-center justify-between transition-colors">
+            <div onclick="navigate('detail', '${t.id}')" class="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xs hover:border-sky-300 cursor-pointer flex items-center justify-between transition-colors">
               <div class="min-w-0 pr-2">
                 <div class="font-bold text-slate-800 text-sm truncate">${escapeHtml(t.title)}</div>
                 <div class="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
@@ -168,18 +176,18 @@
       // New Trip Form
       const today = new Date().toISOString().split('T')[0];
       html += `
-        <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80">
+        <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200">
           <h3 class="text-xs font-bold text-slate-800 mb-3 flex items-center gap-1.5">
             <i data-lucide="plus-circle" class="w-4 h-4 text-sky-500"></i> 新しい旅行を作成
           </h3>
-          <form onsubmit="handleCreateTrip(event)" class="space-y-3 text-xs">
+          <form onsubmit="handleCreateTrip(event)" class="space-y-3.5 text-xs">
             <div>
               <label class="block font-semibold text-slate-700 mb-1">目的地</label>
               <input type="text" id="form-dest" required placeholder="例: 京都、金沢、仙台、沖縄、東京" value="京都" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs focus:outline-none focus:border-sky-500">
             </div>
             <div>
               <label class="block font-semibold text-slate-700 mb-1">旅行タイトル (任意)</label>
-              <input type="text" id="form-title" placeholder="例: 京都2泊3日の旅" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
+              <input type="text" id="form-title" placeholder="例: 京都2泊3日旅行" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
@@ -191,17 +199,39 @@
                 <input type="date" id="form-end" required value="${today}" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500">
               </div>
             </div>
+
+            <!-- Participant Members Tag Input -->
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">参加メンバー（割り勘用）</label>
-              <input type="text" id="form-members" value="自分" placeholder="カンマ区切り（例: 自分, Aさん）" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500">
-              <span class="text-[10px] text-slate-400">※一人旅は「自分」のみでOK</span>
+              <label class="block font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                <span>参加メンバー（割り勘・立替対象）</span>
+                <span class="text-[10px] text-slate-400 font-normal">旅行作成後も追加・変更可能</span>
+              </label>
+              <div id="creation-members-tags" class="flex flex-wrap gap-1.5 mb-2">
+                ${creationMembers.map((m, idx) => `
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs">
+                    <i data-lucide="user" class="w-3 h-3 text-emerald-600"></i> ${escapeHtml(m)}
+                    ${creationMembers.length > 1 ? `
+                      <button type="button" onclick="removeCreationMember(${idx})" class="hover:text-red-500 ml-0.5">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                      </button>
+                    ` : ''}
+                  </span>
+                `).join('')}
+              </div>
+              <div class="flex gap-1.5">
+                <input type="text" id="new-member-input" placeholder="メンバー名を追加（例: Aさん、友人）" class="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
+                <button type="button" onclick="addCreationMember()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1 shadow-2xs">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i> 追加
+                </button>
+              </div>
             </div>
+
             <div class="pt-1">
               <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
                 <input type="checkbox" id="form-preset" class="rounded text-sky-600">
                 <div>
                   <span class="font-bold text-slate-700">主要観光スポットを初期セットする</span>
-                  <div class="text-[10px] text-slate-400">代表スポットを自動で枠組み登録（後から変更可能）</div>
+                  <div class="text-[10px] text-slate-400">代表スポットを自動で枠組み登録（後から自由に変更可能）</div>
                 </div>
               </label>
             </div>
@@ -222,6 +252,21 @@
       container.innerHTML = html;
     }
 
+    function addCreationMember() {
+      const input = document.getElementById('new-member-input');
+      const val = input.value.trim();
+      if (!val) return;
+      if (!creationMembers.includes(val)) {
+        creationMembers.push(val);
+      }
+      input.value = '';
+      render();
+    }
+    function removeCreationMember(idx) {
+      creationMembers.splice(idx, 1);
+      render();
+    }
+
     // --- 2. Detail View ---
     function renderDetail(container, headerActions) {
       const data = getTripData(currentTripId);
@@ -231,7 +276,7 @@
       }
       const { trip, members, spots, expenses } = data;
 
-      // Header button: Backup JSON
+      // Header Actions
       headerActions.innerHTML = `
         <button onclick="exportBackup()" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg flex items-center gap-1">
           <i data-lucide="download" class="w-3 h-3"></i> 保存
@@ -258,27 +303,32 @@
       let html = `
         <!-- Trip Info Card -->
         <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mb-3">
-          <h2 class="text-base font-black text-slate-800">${escapeHtml(trip.title)}</h2>
-          <div class="flex flex-wrap items-center gap-2.5 mt-1.5 text-xs text-slate-500 font-medium">
+          <div class="flex items-start justify-between">
+            <h2 class="text-base font-black text-slate-800">${escapeHtml(trip.title)}</h2>
+            <button onclick="openEditTripModal()" class="text-slate-400 hover:text-sky-600 p-1">
+              <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 mt-2 text-xs text-slate-500 font-medium">
             <span class="text-sky-700 font-bold bg-sky-50 px-2 py-0.5 rounded-md flex items-center gap-1">
               <i data-lucide="map-pin" class="w-3 h-3 text-sky-500"></i> ${escapeHtml(trip.destination)}
             </span>
             <span class="flex items-center gap-1">
               <i data-lucide="calendar" class="w-3 h-3 text-slate-400"></i> ${trip.start_date}〜 (${totalDays}日間)
             </span>
-            <span class="flex items-center gap-1">
-              <i data-lucide="users" class="w-3 h-3 text-emerald-500"></i> ${members.length}名
-            </span>
+            <button onclick="setTab('warikan'); setWarikanSubTab('members')" class="flex items-center gap-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-md font-bold transition-colors">
+              <i data-lucide="users" class="w-3 h-3 text-emerald-600"></i> ${members.length}名 (管理)
+            </button>
           </div>
         </div>
 
-        <!-- Tab Switcher -->
+        <!-- Main Tab Switcher -->
         <div class="flex bg-slate-200/80 p-1 rounded-2xl mb-3 font-bold text-xs">
           <button onclick="setTab('timeline')" class="flex-1 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === 'timeline' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-600'}">
             <i data-lucide="list-ordered" class="w-3.5 h-3.5"></i> 旅程・マップ (${spots.length})
           </button>
-          <button onclick="setTab('expenses')" class="flex-1 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab !== 'timeline' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600'}">
-            <i data-lucide="dollar-sign" class="w-3.5 h-3.5"></i> 支出・割り勘 (¥${totalExpense.toLocaleString()})
+          <button onclick="setTab('warikan')" class="flex-1 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all ${activeTab === 'warikan' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600'}">
+            <i data-lucide="dollar-sign" class="w-3.5 h-3.5"></i> 割り勘・精算 (${expenses.length})
           </button>
         </div>
       `;
@@ -308,7 +358,7 @@
       }
       html += `</div>`;
 
-      // 1-Day Route Link (Waypoints)
+      // 1-Day Multi-stop Route Link
       const dayDuration = daySpots.reduce((s, spot) => s + (spot.duration_min || 0), 0);
       const dayEstimate = daySpots.reduce((s, spot) => s + (spot.cost_estimate || 0), 0);
 
@@ -386,7 +436,7 @@
                     <a href="${searchUrl}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 px-2 py-1 bg-white text-slate-600 border border-slate-300 hover:bg-slate-50 rounded-md text-[11px]">
                       詳細 <i data-lucide="external-link" class="w-2.5 h-2.5"></i>
                     </a>
-                    <button onclick="openAddExpenseModal('${escapeQuotes(spot.name)}', ${spot.cost_estimate || 0})" class="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-md text-[11px] font-bold ml-auto">
+                    <button onclick="openAddExpenseModalWithPrefill('${escapeQuotes(spot.name)}', ${spot.cost_estimate || 0})" class="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-md text-[11px] font-bold ml-auto">
                       <i data-lucide="dollar-sign" class="w-3 h-3"></i> 支出記録
                     </button>
                   </div>
@@ -411,7 +461,7 @@
         html += `</div>`;
       }
 
-      // Add Spot Trigger
+      // Add Spot Button
       html += `
         <button onclick="openAddSpotModal()" class="mt-4 w-full py-2.5 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border border-dashed border-sky-300 transition-colors">
           <i data-lucide="plus" class="w-3.5 h-3.5"></i> ${activeDay}日目にスポットを追加
@@ -436,8 +486,8 @@
                 <span class="text-xs text-emerald-100 font-medium">実績支出合計</span>
                 <div class="text-2xl font-black tracking-tight mt-0.5">¥${totalExpense.toLocaleString()}</div>
               </div>
-              <button onclick="openAddExpenseModal()" class="px-3 py-1.5 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl font-bold text-xs flex items-center gap-1 shadow-sm">
-                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 支出を記録
+              <button onclick="openAddExpenseModal()" class="px-3.5 py-2 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="plus" class="w-4 h-4"></i> 支出を記録
               </button>
             </div>
             ${totalBudget > 0 ? `
@@ -450,68 +500,407 @@
             ` : ''}
           </div>
 
-          <!-- Expenses List -->
-          <div class="mb-4">
-            <h4 class="font-bold text-xs text-slate-700 mb-2 flex items-center gap-1">
-              <i data-lucide="receipt" class="w-3.5 h-3.5 text-emerald-600"></i> 支出一覧 (${expenses.length}件)
-            </h4>
-            ${expenses.length === 0 ? `
-              <div class="py-6 text-center text-slate-400 text-xs">まだ支出の記録はありません。</div>
-            ` : `
-              <div class="space-y-1.5">
-                ${expenses.map(e => `
-                  <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
-                    <div class="min-w-0 pr-2">
-                      <div class="font-bold text-slate-800 text-xs truncate">${escapeHtml(e.title)}</div>
-                      <div class="text-[11px] text-slate-400">
-                        支払者: <span class="font-medium text-emerald-700">${memberMap.get(e.payer_id) || '自分'}</span>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                      <div class="font-extrabold text-slate-800 text-sm">¥${e.amount.toLocaleString()}</div>
-                      <button onclick="deleteExpense('${e.id}')" class="p-1 text-slate-300 hover:text-red-500">
-                        <i data-lucide="trash-2" class="w-3 h-3"></i>
-                      </button>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-            `}
+          <!-- Sub Tab Switcher -->
+          <div class="flex border-b border-slate-200 mb-3 text-xs font-bold">
+            <button onclick="setWarikanSubTab('expenses')" class="flex-1 py-2 flex items-center justify-center gap-1 border-b-2 transition-all ${warikanSubTab === 'expenses' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-slate-400'}">
+              <i data-lucide="receipt" class="w-3.5 h-3.5"></i> 支出一覧 (${expenses.length})
+            </button>
+            <button onclick="setWarikanSubTab('lendings')" class="flex-1 py-2 flex items-center justify-center gap-1 border-b-2 transition-all ${warikanSubTab === 'lendings' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-slate-400'}">
+              <i data-lucide="user-check" class="w-3.5 h-3.5"></i> 立替明細 (${itemizedLendings.length})
+            </button>
+            <button onclick="setWarikanSubTab('settlement')" class="flex-1 py-2 flex items-center justify-center gap-1 border-b-2 transition-all ${warikanSubTab === 'settlement' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-slate-400'}">
+              <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i> 最終精算
+            </button>
+            <button onclick="setWarikanSubTab('members')" class="flex-1 py-2 flex items-center justify-center gap-1 border-b-2 transition-all ${warikanSubTab === 'members' ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-slate-400'}">
+              <i data-lucide="users" class="w-3.5 h-3.5"></i> メンバー (${members.length})
+            </button>
           </div>
-
-          <!-- Settlement Summary -->
-          ${members.length > 1 ? `
-            <div class="pt-3 border-t border-slate-200">
-              <h4 class="font-bold text-xs text-slate-700 mb-2 flex items-center gap-1">
-                <i data-lucide="arrow-left-right" class="w-3.5 h-3.5 text-emerald-600"></i> 最終精算（相殺サマリー）
-              </h4>
-              ${settlements.length === 0 ? `
-                <div class="text-xs text-slate-400 py-3 text-center">立替の差額はありません。</div>
-              ` : `
-                <div class="space-y-2 mb-3">
-                  ${settlements.map(s => `
-                    <div class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-center justify-between text-xs font-bold">
-                      <div class="flex items-center gap-1.5">
-                        <span class="bg-white px-2 py-0.5 border border-slate-200 rounded text-slate-700">${s.fromName}</span>
-                        <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-emerald-600"></i>
-                        <span class="bg-emerald-600 px-2 py-0.5 rounded text-white">${s.toName}</span>
-                      </div>
-                      <span class="text-sm font-black text-emerald-800">¥${s.amount.toLocaleString()}</span>
-                    </div>
-                  `).join('')}
-                </div>
-                <button onclick="copySettlement()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
-                  <i data-lucide="copy" class="w-3.5 h-3.5"></i> 精算結果をコピー（LINE共有用）
-                </button>
-              `}
-            </div>
-          ` : ''}
-        </div>
       `;
+
+      // Sub-tab 1: Expenses List
+      if (warikanSubTab === 'expenses') {
+        if (expenses.length === 0) {
+          html += `<div class="py-10 text-center text-slate-400 text-xs">まだ支出の記録はありません。「支出を記録」から追加してください。</div>`;
+        } else {
+          html += `<div class="space-y-2">`;
+          expenses.forEach(e => {
+            const payerName = memberMap.get(e.payer_id) || '自分';
+            const targetNames = (e.splits || []).map(s => memberMap.get(s.member_id) || '不明').join(', ');
+            const isAll = (e.splits || []).length === members.length;
+
+            html += `
+              <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                <div class="min-w-0 pr-2">
+                  <div class="flex items-center gap-1.5 mb-0.5">
+                    <span class="font-bold text-slate-800 text-sm truncate">${escapeHtml(e.title)}</span>
+                    <span class="text-[10px] px-1.5 py-0.2 bg-white border border-slate-200 rounded text-slate-500">${getCategoryText(e.category)}</span>
+                  </div>
+                  <div class="text-[11px] text-slate-500">
+                    <strong class="text-emerald-700 font-semibold">${escapeHtml(payerName)}</strong> が支払
+                    <span class="text-slate-400 ml-1.5">（対象: ${isAll ? `全員(${members.length}名)` : escapeHtml(targetNames)}）</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <div class="text-right">
+                    <div class="font-extrabold text-slate-800 text-sm">¥${e.amount.toLocaleString()}</div>
+                    <div class="text-[10px] text-slate-400">${e.paid_date || ''}</div>
+                  </div>
+                  <button onclick="deleteExpense('${e.id}')" class="p-1.5 text-slate-300 hover:text-red-500 rounded-lg hover:bg-red-50">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+              </div>
+            `;
+          });
+          html += `</div>`;
+        }
+      }
+
+      // Sub-tab 2: Itemized Lendings (Who paid for whom)
+      else if (warikanSubTab === 'lendings') {
+        html += `
+          <div class="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 p-2.5 rounded-lg mb-2.5">
+            💡「だれが」「だれの」分を立て替えたかの一覧明細です。
+          </div>
+        `;
+        if (itemizedLendings.length === 0) {
+          html += `<div class="py-10 text-center text-slate-400 text-xs">立替データはありません（各自で支払っているか、未登録です）。</div>`;
+        } else {
+          html += `<div class="space-y-2">`;
+          itemizedLendings.forEach(item => {
+            html += `
+              <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                <div>
+                  <div class="font-bold text-slate-800 flex items-center gap-1.5">
+                    <span class="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded text-xs font-semibold">${escapeHtml(item.payerName)}</span>
+                    <i data-lucide="arrow-right" class="w-3 h-3 text-slate-400"></i>
+                    <span class="text-sky-700 bg-sky-100 px-1.5 py-0.5 rounded text-xs font-semibold">${escapeHtml(item.beneficiaryName)}</span>
+                  </div>
+                  <div class="text-slate-500 text-[11px] mt-1">
+                    用途: <strong class="text-slate-700">${escapeHtml(item.title)}</strong> (${item.date || ''})
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="text-sm font-extrabold text-slate-800">¥${item.amount.toLocaleString()}</span>
+                  <div class="text-[10px] text-slate-400">立替中</div>
+                </div>
+              </div>
+            `;
+          });
+          html += `</div>`;
+        }
+      }
+
+      // Sub-tab 3: Final Settlement (Minimal transfers)
+      else if (warikanSubTab === 'settlement') {
+        html += `
+          <div class="text-xs bg-slate-100 text-slate-600 p-2.5 rounded-lg mb-2.5">
+            立替分をすべて相殺し、最小の送金回数で過不足なく割り勘を完了します。
+          </div>
+        `;
+        if (settlements.length === 0) {
+          html += `<div class="py-10 text-center text-slate-400 text-xs">全員の収支が一致しているか、精算の必要はありません。</div>`;
+        } else {
+          html += `<div class="space-y-2 mb-3">`;
+          settlements.forEach(s => {
+            html += `
+              <div class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-center justify-between text-xs font-bold">
+                <div class="flex items-center gap-2">
+                  <span class="bg-white px-2 py-1 border border-slate-200 rounded text-slate-700">${escapeHtml(s.fromName)}</span>
+                  <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-emerald-600"></i>
+                  <span class="bg-emerald-600 px-2 py-1 rounded text-white">${escapeHtml(s.toName)}</span>
+                </div>
+                <div class="text-right">
+                  <span class="text-base font-black text-emerald-800">¥${s.amount.toLocaleString()}</span>
+                  <div class="text-[10px] text-emerald-600">送金</div>
+                </div>
+              </div>
+            `;
+          });
+          html += `</div>`;
+          html += `
+            <button onclick="copySettlement()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i> 精算結果をコピー（LINE共有用）
+            </button>
+          `;
+        }
+      }
+
+      // Sub-tab 4: Members Management
+      else if (warikanSubTab === 'members') {
+        html += `
+          <div class="mb-3">
+            <h4 class="text-xs font-bold text-slate-700 mb-2">参加メンバー一覧</h4>
+            <div class="space-y-1.5 mb-3">
+              ${members.map((m, idx) => `
+                <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                  <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="user" class="w-3.5 h-3.5 text-emerald-600"></i> ${escapeHtml(m.name)}
+                    ${m.is_creator ? '<span class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded font-normal">作成者</span>' : ''}
+                  </span>
+                  ${members.length > 1 ? `
+                    <button onclick="deleteMember('${m.id}')" class="p-1 text-slate-400 hover:text-red-500 rounded hover:bg-red-50" title="削除">
+                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+            <!-- Add New Member Form -->
+            <form onsubmit="handleAddMember(event)" class="flex gap-1.5">
+              <input type="text" id="add-member-name" required placeholder="新しいメンバー名（例: Cさん）" class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-emerald-500">
+              <button type="submit" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1 shadow-2xs">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 追加
+              </button>
+            </form>
+          </div>
+        `;
+      }
+
+      html += `</div>`;
       return html;
     }
 
-    // --- Helpers & Modals ---
+    // --- Modal Handlers ---
+    function closeModal() {
+      const modal = document.getElementById('modal-container');
+      modal.classList.add('hidden');
+      modal.innerHTML = '';
+    }
+
+    // Rich Modal: Add Expense
+    function openAddExpenseModal(prefillTitle = '', prefillAmount = 0) {
+      const data = getTripData(currentTripId);
+      if (!data) return;
+      const { members } = data;
+
+      const modal = document.getElementById('modal-container');
+      modal.classList.remove('hidden');
+
+      const today = new Date().toISOString().split('T')[0];
+
+      modal.innerHTML = `
+        <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+          <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <h3 class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+              <i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-600"></i> 支出を記録
+            </h3>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <form onsubmit="handleSaveExpense(event)" class="space-y-3 text-xs">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">何（支出内容）</label>
+              <input type="text" id="exp-title" required value="${escapeHtml(prefillTitle)}" placeholder="例: 夕食代、レンタカー、拝観料" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">金額 (円)</label>
+                <input type="number" id="exp-amount" required min="1" value="${prefillAmount > 0 ? prefillAmount : ''}" placeholder="3000" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs focus:outline-none focus:border-emerald-500">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">カテゴリ</label>
+                <select id="exp-cat" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-emerald-500">
+                  <option value="food">グルメ・飲食</option>
+                  <option value="transit">交通費</option>
+                  <option value="sightseeing">観光・拝観料</option>
+                  <option value="shopping">買い物・お土産</option>
+                  <option value="hotel">宿泊・休憩</option>
+                  <option value="other">その他</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">だれが支払ったか（立替者）</label>
+              <select id="exp-payer" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs focus:outline-none focus:border-emerald-500">
+                ${members.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('')}
+              </select>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block font-semibold text-slate-700">だれの分か（割り勘対象）</label>
+                <button type="button" onclick="toggleAllTargets(true)" class="text-[10px] text-emerald-600 font-bold hover:underline">全員選択</button>
+              </div>
+              <div class="grid grid-cols-2 gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                ${members.map(m => `
+                  <label class="flex items-center gap-1.5 p-1 rounded cursor-pointer text-xs font-medium">
+                    <input type="checkbox" name="target-members" value="${m.id}" checked class="rounded text-emerald-600 focus:ring-emerald-500">
+                    <span class="truncate">${escapeHtml(m.name)}</span>
+                  </label>
+                `).join('')}
+              </div>
+              <p class="text-[10px] text-slate-400 mt-1">※特定の人への立替なら、その人だけにチェックを入れます。</p>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">支払日</label>
+              <input type="date" id="exp-date" required value="${today}" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div class="flex gap-2 pt-2">
+              <button type="button" onclick="closeModal()" class="flex-1 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200">
+                キャンセル
+              </button>
+              <button type="submit" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm">
+                保存する
+              </button>
+            </div>
+          </form>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    function openAddExpenseModalWithPrefill(title, cost) {
+      setTab('warikan');
+      openAddExpenseModal(title, cost);
+    }
+
+    function toggleAllTargets(checked) {
+      const boxes = document.querySelectorAll('input[name="target-members"]');
+      boxes.forEach(b => b.checked = checked);
+    }
+
+    function handleSaveExpense(e) {
+      e.preventDefault();
+      const title = document.getElementById('exp-title').value.trim();
+      const amount = parseInt(document.getElementById('exp-amount').value, 10);
+      const category = document.getElementById('exp-cat').value;
+      const payerId = document.getElementById('exp-payer').value;
+      const paidDate = document.getElementById('exp-date').value;
+
+      const checkedBoxes = Array.from(document.querySelectorAll('input[name="target-members"]:checked'));
+      const targetIds = checkedBoxes.map(b => b.value);
+
+      if (!title || !amount || amount <= 0) return;
+      if (targetIds.length === 0) {
+        alert('割り勘の対象者を最低1人選択してください。');
+        return;
+      }
+
+      // Calculate splits
+      const baseShare = Math.floor(amount / targetIds.length);
+      const remainder = amount % targetIds.length;
+      const splits = targetIds.map((mid, idx) => ({
+        member_id: mid,
+        allocated_amount: baseShare + (idx === 0 ? remainder : 0)
+      }));
+
+      const data = getTripData(currentTripId);
+      const newExp = {
+        id: 'exp_' + Date.now(),
+        title,
+        amount,
+        category,
+        payer_id: payerId,
+        paid_date: paidDate,
+        splits
+      };
+      data.expenses.push(newExp);
+      saveTripData(currentTripId, data);
+      closeModal();
+      setWarikanSubTab('expenses');
+      render();
+    }
+
+    // Modal: Add Spot
+    function openAddSpotModal() {
+      const modal = document.getElementById('modal-container');
+      modal.classList.remove('hidden');
+
+      modal.innerHTML = `
+        <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-slate-100">
+          <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <h3 class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+              <i data-lucide="map-pin" class="w-4 h-4 text-sky-500"></i> 新しいスポットを追加
+            </h3>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <form onsubmit="handleSaveSpot(event)" class="space-y-3 text-xs">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">スポット名</label>
+              <input type="text" id="spot-name" required placeholder="例: 清水寺、錦市場、ホテル" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs focus:outline-none focus:border-sky-500">
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">カテゴリ</label>
+              <select id="spot-cat" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
+                <option value="sightseeing">観光</option>
+                <option value="food">グルメ・飲食店</option>
+                <option value="transit">交通・移動</option>
+                <option value="shopping">買い物・お土産</option>
+                <option value="hotel">宿泊・休憩</option>
+                <option value="other">その他</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">メモ・見どころ (任意)</label>
+              <input type="text" id="spot-memo" placeholder="例: 舞台からの景色、名物団子" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">滞在目安(分)</label>
+                <input type="number" id="spot-duration" min="15" step="15" value="60" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">予算目安(円)</label>
+                <input type="number" id="spot-cost" min="0" step="100" value="0" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
+              </div>
+            </div>
+
+            <div class="flex gap-2 pt-2">
+              <button type="button" onclick="closeModal()" class="flex-1 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200">
+                キャンセル
+              </button>
+              <button type="submit" class="flex-1 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-xl shadow-sm">
+                追加する
+              </button>
+            </div>
+          </form>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    function handleSaveSpot(e) {
+      e.preventDefault();
+      const name = document.getElementById('spot-name').value.trim();
+      const category = document.getElementById('spot-cat').value;
+      const memo = document.getElementById('spot-memo').value.trim();
+      const duration = parseInt(document.getElementById('spot-duration').value, 10) || 60;
+      const cost = parseInt(document.getElementById('spot-cost').value, 10) || 0;
+
+      if (!name) return;
+      const data = getTripData(currentTripId);
+      const daySpots = data.spots.filter(s => s.day_number === activeDay);
+
+      const newSpot = {
+        id: 'spot_' + Date.now(),
+        day_number: activeDay,
+        sort_order: daySpots.length,
+        name,
+        category,
+        memo,
+        duration_min: duration,
+        cost_estimate: cost
+      };
+      data.spots.push(newSpot);
+      saveTripData(currentTripId, data);
+      closeModal();
+      render();
+    }
+
+    // --- Helpers & State Transitions ---
     function selectDay(day) {
       activeDay = day;
       render();
@@ -520,19 +909,87 @@
       activeTab = tab;
       render();
     }
+    function setWarikanSubTab(subTab) {
+      warikanSubTab = subTab;
+      render();
+    }
 
-    // Handlers: Create Trip
+    // Spot Controls
+    function moveSpot(spotId, dir) {
+      const data = getTripData(currentTripId);
+      const daySpots = data.spots.filter(s => s.day_number === activeDay).sort((a, b) => a.sort_order - b.sort_order);
+      const idx = daySpots.findIndex(s => s.id === spotId);
+      if (idx < 0) return;
+      const targetIdx = idx + dir;
+      if (targetIdx < 0 || targetIdx >= daySpots.length) return;
+
+      const cur = daySpots[idx];
+      const target = daySpots[targetIdx];
+      cur.sort_order = targetIdx;
+      target.sort_order = idx;
+
+      saveTripData(currentTripId, data);
+      render();
+    }
+
+    function deleteSpot(spotId) {
+      if (!confirm('このスポットを削除しますか？')) return;
+      const data = getTripData(currentTripId);
+      data.spots = data.spots.filter(s => s.id !== spotId);
+      saveTripData(currentTripId, data);
+      render();
+    }
+
+    function deleteExpense(expId) {
+      if (!confirm('この支出記録を削除しますか？')) return;
+      const data = getTripData(currentTripId);
+      data.expenses = data.expenses.filter(e => e.id !== expId);
+      saveTripData(currentTripId, data);
+      render();
+    }
+
+    // Member Management
+    function handleAddMember(e) {
+      e.preventDefault();
+      const input = document.getElementById('add-member-name');
+      const name = input.value.trim();
+      if (!name) return;
+
+      const data = getTripData(currentTripId);
+      if (data.members.some(m => m.name === name)) {
+        alert('同名のメンバーが既に登録されています。');
+        return;
+      }
+      data.members.push({
+        id: 'mem_' + Date.now(),
+        name,
+        is_creator: false
+      });
+      saveTripData(currentTripId, data);
+      input.value = '';
+      render();
+    }
+
+    function deleteMember(memberId) {
+      const data = getTripData(currentTripId);
+      const m = data.members.find(x => x.id === memberId);
+      if (!confirm(`「${m?.name}」をメンバーから削除しますか？`)) return;
+
+      data.members = data.members.filter(x => x.id !== memberId);
+      saveTripData(currentTripId, data);
+      render();
+    }
+
+    // Create Trip Handler
     function handleCreateTrip(e) {
       e.preventDefault();
       const dest = document.getElementById('form-dest').value.trim();
       const title = document.getElementById('form-title').value.trim() || `${dest}の旅`;
       const start = document.getElementById('form-start').value;
       const end = document.getElementById('form-end').value;
-      const membersInput = document.getElementById('form-members').value;
       const usePreset = document.getElementById('form-preset').checked;
 
-      const memberNames = membersInput.split(',').map(m => m.trim()).filter(Boolean);
-      if (memberNames.length === 0) memberNames.push('自分');
+      const memberNames = creationMembers.length > 0 ? creationMembers : ['自分'];
 
       const tripId = 'trip_' + Date.now();
       const trip = { id: tripId, title, destination: dest, start_date: start, end_date: end };
@@ -562,7 +1019,6 @@
       navigate('detail', tripId);
     }
 
-    // Delete Trip
     function deleteTrip(id) {
       if (!confirm('この旅行プランを削除しますか？')) return;
       localStorage.removeItem(`trip_${id}`);
@@ -574,96 +1030,7 @@
       render();
     }
 
-    // Spot Operations
-    function openAddSpotModal() {
-      const name = prompt('スポット名を入力してください (例: 清水寺、金閣寺、カフェ):');
-      if (!name || !name.trim()) return;
-      const memo = prompt('メモ・見どころ (任意):') || '';
-      const costStr = prompt('予算目安 (円、数字のみ):', '0') || '0';
-
-      const data = getTripData(currentTripId);
-      const daySpots = data.spots.filter(s => s.day_number === activeDay);
-      const newSpot = {
-        id: 'spot_' + Date.now(),
-        day_number: activeDay,
-        sort_order: daySpots.length,
-        name: name.trim(),
-        category: 'sightseeing',
-        memo: memo.trim(),
-        duration_min: 60,
-        cost_estimate: parseInt(costStr, 10) || 0
-      };
-      data.spots.push(newSpot);
-      saveTripData(currentTripId, data);
-      render();
-    }
-
-    function moveSpot(spotId, dir) {
-      const data = getTripData(currentTripId);
-      const daySpots = data.spots.filter(s => s.day_number === activeDay).sort((a, b) => a.sort_order - b.sort_order);
-      const idx = daySpots.findIndex(s => s.id === spotId);
-      if (idx < 0) return;
-      const targetIdx = idx + dir;
-      if (targetIdx < 0 || targetIdx >= daySpots.length) return;
-
-      const currentSpot = daySpots[idx];
-      const targetSpot = daySpots[targetIdx];
-
-      currentSpot.sort_order = targetIdx;
-      targetSpot.sort_order = idx;
-
-      saveTripData(currentTripId, data);
-      render();
-    }
-
-    function deleteSpot(spotId) {
-      if (!confirm('このスポットを削除しますか？')) return;
-      const data = getTripData(currentTripId);
-      data.spots = data.spots.filter(s => s.id !== spotId);
-      saveTripData(currentTripId, data);
-      render();
-    }
-
-    // Expense Operations
-    function openAddExpenseModal(prefillTitle = '', prefillAmount = 0) {
-      const title = prompt('支出項目を入力してください (例: 夕食代、拝観料、お土産):', prefillTitle);
-      if (!title || !title.trim()) return;
-      const amountStr = prompt('金額 (円、半角数字):', prefillAmount > 0 ? String(prefillAmount) : '1000');
-      const amount = parseInt(amountStr, 10);
-      if (!amount || amount <= 0) return;
-
-      const data = getTripData(currentTripId);
-      const payerId = data.members[0]?.id || 'mem_self';
-
-      const splits = data.members.map(m => ({
-        member_id: m.id,
-        allocated_amount: Math.round(amount / data.members.length)
-      }));
-
-      const newExpense = {
-        id: 'exp_' + Date.now(),
-        title: title.trim(),
-        amount: amount,
-        category: 'food',
-        payer_id: payerId,
-        paid_date: new Date().toISOString().split('T')[0],
-        splits: splits
-      };
-
-      data.expenses.push(newExpense);
-      saveTripData(currentTripId, data);
-      setTab('expenses');
-    }
-
-    function deleteExpense(expId) {
-      if (!confirm('この支出記録を削除しますか？')) return;
-      const data = getTripData(currentTripId);
-      data.expenses = data.expenses.filter(e => e.id !== expId);
-      saveTripData(currentTripId, data);
-      render();
-    }
-
-    // Warikan Algorithms
+    // Warikan Logic: Itemized Lendings
     function calculateItemizedLendings(expenses, members) {
       const memberMap = new Map(members.map(m => [m.id, m.name]));
       const lendings = [];
@@ -677,13 +1044,15 @@
             payerName,
             beneficiaryName: memberMap.get(split.member_id) || '不明',
             title: exp.title,
-            amount: split.allocated_amount
+            amount: split.allocated_amount,
+            date: exp.paid_date
           });
         }
       }
       return lendings;
     }
 
+    // Warikan Logic: Optimal Settlements
     function calculateOptimalSettlements(expenses, members) {
       const memberMap = new Map(members.map(m => [m.id, m.name]));
       const balances = {};
@@ -737,7 +1106,7 @@
       const text = settlements.map(s => `・${s.fromName} → ${s.toName}：¥${s.amount.toLocaleString()}`).join('\n');
       const total = data.expenses.reduce((s, e) => s + e.amount, 0);
       const msg = `【${data.trip.title} 割り勘精算】\n総支出: ¥${total.toLocaleString()}\n\n▼ 清算送金リスト\n${text}`;
-      navigator.clipboard.writeText(msg).then(() => alert('精算結果をクリップボードにコピーしました！LINE等に貼り付けて共有できます。'));
+      navigator.clipboard.writeText(msg).then(() => alert('精算結果をコピーしました！LINE等に貼り付けて共有できます。'));
     }
 
     // Export & Import
@@ -779,6 +1148,7 @@
         case 'food': return 'グルメ';
         case 'hotel': return '宿泊';
         case 'shopping': return '買物';
+        case 'transit': return '交通';
         default: return '観光';
       }
     }
