@@ -28,7 +28,7 @@
         <div>
           <div class="flex items-center gap-1.5">
             <h1 class="font-black text-sm tracking-tight text-slate-800 leading-none">TabiPlan</h1>
-            <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold">v5.0（Supabaseクラウドリアルタイム同期対応版）</span>
+            <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold">v6.0（ハイブリッド完全共有・ゼロ設定即時表示版）</span>
           </div>
           <span class="text-[10px] text-slate-400 font-medium">旅程・マップ・割り勘精算</span>
         </div>
@@ -84,6 +84,29 @@
       ]
     };
 
+
+    // Hybrid Share: Encode/Decode Trip Data via URL Hash
+    function encodeTripToHash(data) {
+      try {
+        const json = JSON.stringify(data);
+        const utf8 = encodeURIComponent(json);
+        return btoa(utf8);
+      } catch (e) { return ''; }
+    }
+
+    function decodeTripFromHash(hash) {
+      try {
+        if (!hash) return null;
+        const cleanHash = hash.replace(/^#data=/, '').replace(/^#/, '');
+        const utf8 = atob(cleanHash);
+        const json = decodeURIComponent(utf8);
+        return JSON.parse(json);
+      } catch (e) {
+        console.warn('Hash decode failed:', e);
+        return null;
+      }
+    }
+
     // --- State Management ---
     let currentView = 'home';
     let currentTripId = null;
@@ -96,12 +119,30 @@
     let supabaseClient = null;
     let activeRealtimeChannel = null;
 
+    // Helper: Sanitize Supabase Project URL
+    function sanitizeSupabaseUrl(rawUrl) {
+      if (!rawUrl) return '';
+      let url = rawUrl.trim();
+      // If user pasted dashboard URL: https://supabase.com/dashboard/project/<project-id>/...
+      const dashMatch = url.match(/\/project\/([a-zA-Z0-9_-]+)/);
+      if (dashMatch) {
+        return `https://${dashMatch[1]}.supabase.co`;
+      }
+      try {
+        const parsed = new URL(url);
+        return `${parsed.protocol}//${parsed.host}`;
+      } catch (e) {
+        return url.replace(/\/+$/, '');
+      }
+    }
+
     function initSupabase() {
-      const url = localStorage.getItem('tabiplan_sb_url');
+      const rawUrl = localStorage.getItem('tabiplan_sb_url');
       const key = localStorage.getItem('tabiplan_sb_key');
-      if (url && key && window.supabase) {
+      if (rawUrl && key && window.supabase) {
         try {
-          supabaseClient = window.supabase.createClient(url.trim(), key.trim());
+          const url = sanitizeSupabaseUrl(rawUrl);
+          supabaseClient = window.supabase.createClient(url, key.trim());
           return true;
         } catch (e) {
           console.warn('Supabase init error:', e);
@@ -146,12 +187,15 @@
     async function loadTripFromCloud(tokenOrId) {
       if (!supabaseClient) return null;
       try {
-        // Fetch Trip
-        let { data: trip, error } = await supabaseClient
-          .from('trips')
-          .select('*')
-          .or(`share_token.eq.${tokenOrId},id.eq.${tokenOrId}`)
-          .single();
+        // Fetch Trip (Check if tokenOrId is UUID to avoid Postgres 22P02 error)
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tokenOrId);
+        let tripQuery = supabaseClient.from('trips').select('*');
+        if (isUuid) {
+          tripQuery = tripQuery.or(`share_token.eq.${tokenOrId},id.eq.${tokenOrId}`);
+        } else {
+          tripQuery = tripQuery.eq('share_token', tokenOrId);
+        }
+        let { data: trip, error } = await tripQuery.maybeSingle();
 
         if (error || !trip) {
           console.warn('Trip fetch from cloud failed:', error);
@@ -214,12 +258,73 @@
         .subscribe();
     }
 
+
+    // Automatically sync trips list from Supabase cloud
+    async function syncTripsListFromCloud() {
+      if (!supabaseClient) return;
+      try {
+        const { data: cloudTrips, error } = await supabaseClient
+          .from('trips')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (cloudTrips && cloudTrips.length > 0) {
+          const localTrips = getStoredTrips();
+          const localMap = new Map(localTrips.map(t => [t.id, t]));
+          cloudTrips.forEach(ct => {
+            localMap.set(ct.id, ct);
+          });
+          setStoredTrips(Array.from(localMap.values()));
+        }
+      } catch (e) {
+        console.warn('syncTripsListFromCloud error:', e);
+      }
+    }
+
+    // Automatically push local trip to cloud if missing
+    async function syncTripToCloud(tripId) {
+      if (!supabaseClient) return false;
+      const data = getTripData(tripId);
+      if (!data || !data.trip) return false;
+
+      try {
+        const { data: existing, error } = await supabaseClient
+          .from('trips')
+          .select('id')
+          .eq('id', data.trip.id)
+          .maybeSingle();
+
+        if (!existing) {
+          await supabaseClient.from('trips').insert([data.trip]);
+          if (data.members && data.members.length > 0) {
+            await supabaseClient.from('trip_members').insert(data.members);
+          }
+          if (data.spots && data.spots.length > 0) {
+            await supabaseClient.from('spots').insert(data.spots);
+          }
+          if (data.expenses && data.expenses.length > 0) {
+            const expRows = data.expenses.map(e => {
+              const { splits, ...r } = e;
+              return r;
+            });
+            await supabaseClient.from('expenses').insert(expRows);
+          }
+          console.log('Local trip uploaded to Supabase cloud successfully!');
+          return true;
+        }
+      } catch (err) {
+        console.error('syncTripToCloud error:', err);
+      }
+      return false;
+    }
+
     // --- Navigation Router ---
     function navigate(view, tripId = null) {
       currentView = view;
       if (tripId) {
         currentTripId = tripId;
         if (isCloudSyncEnabled()) {
+          syncTripToCloud(tripId);
           subscribeTripRealtime(tripId);
         }
       }
@@ -919,12 +1024,17 @@
       lucide.createIcons();
     }
 
+
     async function handleSaveSupabaseSettings(e) {
       e.preventDefault();
-      const url = document.getElementById('sb-url').value.trim();
+      let rawUrl = document.getElementById('sb-url').value.trim();
       const key = document.getElementById('sb-key').value.trim();
 
-      if (!url || !key) return;
+      if (!rawUrl || !key) return;
+
+      // Automatically sanitize and correct dashboard URL to API URL
+      const url = sanitizeSupabaseUrl(rawUrl);
+      document.getElementById('sb-url').value = url;
 
       localStorage.setItem('tabiplan_sb_url', url);
       localStorage.setItem('tabiplan_sb_key', key);
@@ -952,8 +1062,8 @@
       render();
     }
 
-    function copySetupSql() {
-      const sql = `-- 1. trips テーブル
+        function copySetupSql() {
+      const sql = `-- 1. テーブル作成
 CREATE TABLE IF NOT EXISTS trips (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   share_token TEXT UNIQUE DEFAULT gen_random_uuid()::text,
@@ -965,7 +1075,6 @@ CREATE TABLE IF NOT EXISTS trips (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 2. trip_members テーブル
 CREATE TABLE IF NOT EXISTS trip_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
@@ -974,7 +1083,6 @@ CREATE TABLE IF NOT EXISTS trip_members (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 3. spots テーブル
 CREATE TABLE IF NOT EXISTS spots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
@@ -989,7 +1097,6 @@ CREATE TABLE IF NOT EXISTS spots (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 4. expenses テーブル
 CREATE TABLE IF NOT EXISTS expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
@@ -1001,7 +1108,6 @@ CREATE TABLE IF NOT EXISTS expenses (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 5. expense_splits テーブル
 CREATE TABLE IF NOT EXISTS expense_splits (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   expense_id UUID REFERENCES expenses(id) ON DELETE CASCADE,
@@ -1009,21 +1115,39 @@ CREATE TABLE IF NOT EXISTS expense_splits (
   allocated_amount INTEGER DEFAULT 0
 );
 
--- RLS (Row Level Security) 設定
+-- 2. RLS 有効化
 ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trip_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE spots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expense_splits ENABLE ROW LEVEL SECURITY;
 
+-- 3. ポリシー再作成（重複エラー防止）
+DROP POLICY IF EXISTS "Public all on trips" ON trips;
 CREATE POLICY "Public all on trips" ON trips FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public all on trip_members" ON trip_members;
 CREATE POLICY "Public all on trip_members" ON trip_members FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public all on spots" ON spots;
 CREATE POLICY "Public all on spots" ON spots FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public all on expenses" ON expenses;
 CREATE POLICY "Public all on expenses" ON expenses FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public all on expense_splits" ON expense_splits;
 CREATE POLICY "Public all on expense_splits" ON expense_splits FOR ALL USING (true) WITH CHECK (true);
 
--- リアルタイム配信の有効化
-ALTER PUBLICATION supabase_realtime ADD TABLE trips, trip_members, spots, expenses, expense_splits;`;
+-- 4. リアルタイム配信
+DO $$
+BEGIN
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE trips, trip_members, spots, expenses, expense_splits;
+  EXCEPTION
+    WHEN duplicate_object THEN
+      NULL;
+  END;
+END $$;`;
 
       navigator.clipboard.writeText(sql).then(() => {
         alert('SQLコードをクリップボードにコピーしました！\nSupabaseの「SQL Editor」を開き、貼り付けて「Run」を実行してください。');
@@ -1031,17 +1155,41 @@ ALTER PUBLICATION supabase_realtime ADD TABLE trips, trip_members, spots, expens
     }
 
     // Share URL Copy
-    function copyShareUrl() {
+        async function copyShareUrl() {
       const data = getTripData(currentTripId);
       if (!data || !data.trip) return;
 
-      const token = data.trip.share_token || data.trip.id;
       const baseUrl = window.location.origin + window.location.pathname;
-      const shareUrl = `${baseUrl}?trip=${encodeURIComponent(token)}`;
+      const token = data.trip.share_token || data.trip.id;
 
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        alert(`【共有URLをコピーしました】\n同行者の方にこのURLをLINE等で送信してください。\n相手もこのリンクを開くだけで、リアルタイムに同じ旅程・割り勘を閲覧・編集できます！\n\n${shareUrl}`);
-      });
+      // 1. Pack full data into hash payload (Guarantees instant display on ANY phone!)
+      const hashPayload = encodeTripToHash(data);
+
+      // 2. Build URL params
+      const params = new URLSearchParams();
+      params.set('trip', token);
+
+      // 3. Include Supabase connection info so companion never needs manual setup
+      const sbUrl = localStorage.getItem('tabiplan_sb_url');
+      const sbKey = localStorage.getItem('tabiplan_sb_key');
+      if (sbUrl && sbKey) {
+        params.set('sb_url', sbUrl);
+        params.set('sb_key', sbKey);
+      }
+
+      const shareUrl = `${baseUrl}?${params.toString()}#data=${hashPayload}`;
+
+      // 4. Also upload to Supabase in background if enabled
+      if (isCloudSyncEnabled()) {
+        syncTripToCloud(currentTripId);
+      }
+
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert(`【共有用URLをコピーしました】\nLINE等で同行者に送信してください：\n\n相手はこのリンクをタップするだけで、面倒な設定ゼロで直接「${data.trip.title}」が表示されます！`);
+      } catch (err) {
+        prompt('以下の共有URLをコピーしてLINE等で送信してください：', shareUrl);
+      }
     }
 
     // Rich Modal: Add Expense
@@ -1676,29 +1824,53 @@ ALTER PUBLICATION supabase_realtime ADD TABLE trips, trip_members, spots, expens
     }
 
     // --- App Lifecycle & URL Parameter Init ---
-    async function initApp() {
+        async function initApp() {
+      // 1. Check if Supabase keys are passed via URL (Auto-configuration for companions!)
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramSbUrl = urlParams.get('sb_url');
+      const paramSbKey = urlParams.get('sb_key');
+      if (paramSbUrl && paramSbKey) {
+        localStorage.setItem('tabiplan_sb_url', paramSbUrl);
+        localStorage.setItem('tabiplan_sb_key', paramSbKey);
+      }
+
       initSupabase();
 
-      // Check URL parameters for ?trip=...
-      const urlParams = new URLSearchParams(window.location.search);
-      const tripToken = urlParams.get('trip');
+      // 2. Check if Trip Data is directly in URL Hash (Instant Zero-Friction Share)
+      if (window.location.hash && window.location.hash.includes('data=')) {
+        const decoded = decodeTripFromHash(window.location.hash);
+        if (decoded && decoded.trip && decoded.trip.id) {
+          saveTripData(decoded.trip.id, decoded);
+          const trips = getStoredTrips().filter(t => t.id !== decoded.trip.id);
+          setStoredTrips([decoded.trip, ...trips]);
+          navigate('detail', decoded.trip.id);
+          return;
+        }
+      }
 
+      // 3. If cloud is connected, sync trips list from cloud
+      if (isCloudSyncEnabled()) {
+        await syncTripsListFromCloud();
+      }
+
+      // 4. Check URL parameter for ?trip=...
+      const tripToken = urlParams.get('trip');
       if (tripToken) {
+        // Check local first
+        const trips = getStoredTrips();
+        const localTrip = trips.find(t => t.id === tripToken || t.share_token === tripToken);
+        if (localTrip) {
+          navigate('detail', localTrip.id);
+          return;
+        }
+
+        // If not in local, check cloud
         if (isCloudSyncEnabled()) {
           const cloudTrip = await loadTripFromCloud(tripToken);
           if (cloudTrip) {
             navigate('detail', cloudTrip.id);
             return;
           }
-        }
-        // Check local
-        const trips = getStoredTrips();
-        const localTrip = trips.find(t => t.id === tripToken || t.share_token === tripToken);
-        if (localTrip) {
-          navigate('detail', localTrip.id);
-          return;
-        } else if (!isCloudSyncEnabled()) {
-          alert('共有された旅行プランを開くには、ヘッダーの「クラウド設定」からSupabaseの接続情報を入力してください。');
         }
       }
 
