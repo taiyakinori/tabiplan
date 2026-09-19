@@ -6,6 +6,8 @@
   <title>TabiPlan - 旅程・Googleマップ連携・割り勘管理</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
@@ -26,7 +28,7 @@
         <div>
           <div class="flex items-center gap-1.5">
             <h1 class="font-black text-sm tracking-tight text-slate-800 leading-none">TabiPlan</h1>
-            <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold">v4.0（移動手段切替：車・電車対応版）</span>
+            <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold">v5.0（Supabaseクラウドリアルタイム同期対応版）</span>
           </div>
           <span class="text-[10px] text-slate-400 font-medium">旅程・マップ・割り勘精算</span>
         </div>
@@ -52,34 +54,33 @@
         { name: '東尋坊', category: 'sightseeing', duration: 90, cost: 500, memo: '日本海の断崖絶壁と海鮮ランチ', travel_mode: 'driving' },
         { name: '福井駅', category: 'transit', duration: 60, cost: 0, memo: '駅前恐竜広場・お土産購入', travel_mode: 'driving' }
       ],
-
       '京都': [
-        { name: '清水寺', category: 'sightseeing', duration: 90, cost: 400, memo: '舞台からの眺望と音羽の滝' },
-        { name: '錦市場', category: 'food', duration: 60, cost: 2000, memo: '京都の台所で食べ歩きランチ' },
-        { name: '金閣寺', category: 'sightseeing', duration: 60, cost: 500, memo: '舎利殿の金箔の輝きを鑑賞' },
-        { name: '伏見稲荷大社', category: 'sightseeing', duration: 90, cost: 0, memo: '千本鳥居の参道散策' }
+        { name: '清水寺', category: 'sightseeing', duration: 90, cost: 400, memo: '舞台からの眺望と音羽の滝', travel_mode: 'transit' },
+        { name: '錦市場', category: 'food', duration: 60, cost: 2000, memo: '京都の台所で食べ歩きランチ', travel_mode: 'walking' },
+        { name: '金閣寺', category: 'sightseeing', duration: 60, cost: 500, memo: '舎利殿の金箔の輝きを鑑賞', travel_mode: 'transit' },
+        { name: '伏見稲荷大社', category: 'sightseeing', duration: 90, cost: 0, memo: '千本鳥居の参道散策', travel_mode: 'transit' }
       ],
       '金沢': [
-        { name: '兼六園', category: 'sightseeing', duration: 90, cost: 320, memo: '日本三名園の回遊式庭園' },
-        { name: '近江町市場', category: 'food', duration: 60, cost: 2500, memo: '新鮮な海鮮丼ランチ' },
-        { name: '金沢21世紀美術館', category: 'sightseeing', duration: 90, cost: 1200, memo: 'スイミング・プールなど現代アート' },
-        { name: 'ひがし茶屋街', category: 'sightseeing', duration: 60, cost: 1000, memo: '風情ある茶屋建築と金箔スイーツ' }
+        { name: '兼六園', category: 'sightseeing', duration: 90, cost: 320, memo: '日本三名園の回遊式庭園', travel_mode: 'walking' },
+        { name: '近江町市場', category: 'food', duration: 60, cost: 2500, memo: '新鮮な海鮮丼ランチ', travel_mode: 'walking' },
+        { name: '金沢21世紀美術館', category: 'sightseeing', duration: 90, cost: 1200, memo: 'スイミング・プールなど現代アート', travel_mode: 'walking' },
+        { name: 'ひがし茶屋街', category: 'sightseeing', duration: 60, cost: 1000, memo: '風情ある茶屋建築と金箔スイーツ', travel_mode: 'transit' }
       ],
       '仙台': [
-        { name: '仙台城跡', category: 'sightseeing', duration: 60, cost: 0, memo: '伊達政宗公騎馬像と市内展望' },
-        { name: '仙台牛たん通り', category: 'food', duration: 60, cost: 2200, memo: '炭火焼きの極上牛たん定食' },
-        { name: '瑞鳳殿', category: 'sightseeing', duration: 60, cost: 570, memo: '豪華絢爛な桃山様式の霊屋' },
-        { name: '松島海岸・五大堂', category: 'sightseeing', duration: 120, cost: 1500, memo: '日本三景松島の遊覧船巡り' }
+        { name: '仙台城跡', category: 'sightseeing', duration: 60, cost: 0, memo: '伊達政宗公騎馬像と市内展望', travel_mode: 'transit' },
+        { name: '仙台牛たん通り', category: 'food', duration: 60, cost: 2200, memo: '炭火焼きの極上牛たん定食', travel_mode: 'walking' },
+        { name: '瑞鳳殿', category: 'sightseeing', duration: 60, cost: 570, memo: '豪華絢爛な桃山様式の霊屋', travel_mode: 'transit' },
+        { name: '松島海岸・五大堂', category: 'sightseeing', duration: 120, cost: 1500, memo: '日本三景松島の遊覧船巡り', travel_mode: 'transit' }
       ],
       '沖縄': [
-        { name: '美ら海水族館', category: 'sightseeing', duration: 120, cost: 2180, memo: '黒潮の海大水槽のジンベエザメ' },
-        { name: '国際通り', category: 'shopping', duration: 90, cost: 3000, memo: 'お土産散策と沖縄そば' },
-        { name: '万座毛', category: 'sightseeing', duration: 45, cost: 100, memo: 'エメラルドグリーンの断崖絶景' }
+        { name: '美ら海水族館', category: 'sightseeing', duration: 120, cost: 2180, memo: '黒潮の海大水槽のジンベエザメ', travel_mode: 'driving' },
+        { name: '国際通り', category: 'shopping', duration: 90, cost: 3000, memo: 'お土産散策と沖縄そば', travel_mode: 'walking' },
+        { name: '万座毛', category: 'sightseeing', duration: 45, cost: 100, memo: 'エメラルドグリーンの断崖絶景', travel_mode: 'driving' }
       ],
       '東京': [
-        { name: '浅草寺・雷門', category: 'sightseeing', duration: 75, cost: 0, memo: '仲見世通りと参拝' },
-        { name: '築地場外市場', category: 'food', duration: 60, cost: 2500, memo: '名物海鮮丼や玉子焼き' },
-        { name: '東京スカイツリー', category: 'sightseeing', duration: 90, cost: 2100, memo: '展望デッキからの眺望' }
+        { name: '浅草寺・雷門', category: 'sightseeing', duration: 75, cost: 0, memo: '仲見世通りと参拝', travel_mode: 'transit' },
+        { name: '築地場外市場', category: 'food', duration: 60, cost: 2500, memo: '名物海鮮丼や玉子焼き', travel_mode: 'transit' },
+        { name: '東京スカイツリー', category: 'sightseeing', duration: 90, cost: 2100, memo: '展望デッキからの眺望', travel_mode: 'transit' }
       ]
     };
 
@@ -89,11 +90,34 @@
     let activeDay = 1;
     let activeTab = 'timeline'; // 'timeline' | 'warikan'
     let warikanSubTab = 'expenses'; // 'expenses' | 'lendings' | 'settlement' | 'members'
-
-    // Form Temporary Members State (For Creation Screen)
     let creationMembers = ['自分', '彼女'];
 
-    // LocalStorage Helper
+    // --- Supabase Cloud Client State ---
+    let supabaseClient = null;
+    let activeRealtimeChannel = null;
+
+    function initSupabase() {
+      const url = localStorage.getItem('tabiplan_sb_url');
+      const key = localStorage.getItem('tabiplan_sb_key');
+      if (url && key && window.supabase) {
+        try {
+          supabaseClient = window.supabase.createClient(url.trim(), key.trim());
+          return true;
+        } catch (e) {
+          console.warn('Supabase init error:', e);
+          supabaseClient = null;
+          return false;
+        }
+      }
+      supabaseClient = null;
+      return false;
+    }
+
+    function isCloudSyncEnabled() {
+      return !!supabaseClient;
+    }
+
+    // --- LocalStorage Helpers ---
     function getStoredTrips() {
       try {
         return JSON.parse(localStorage.getItem('tabiplan_trips') || '[]');
@@ -118,10 +142,87 @@
       if (data.expenses) localStorage.setItem(`expenses_${id}`, JSON.stringify(data.expenses));
     }
 
-    // Navigation Router
+    // --- Supabase Cloud Sync Operations ---
+    async function loadTripFromCloud(tokenOrId) {
+      if (!supabaseClient) return null;
+      try {
+        // Fetch Trip
+        let { data: trip, error } = await supabaseClient
+          .from('trips')
+          .select('*')
+          .or(`share_token.eq.${tokenOrId},id.eq.${tokenOrId}`)
+          .single();
+
+        if (error || !trip) {
+          console.warn('Trip fetch from cloud failed:', error);
+          return null;
+        }
+
+        // Fetch related tables
+        const [memRes, spotRes, expRes] = await Promise.all([
+          supabaseClient.from('trip_members').select('*').eq('trip_id', trip.id),
+          supabaseClient.from('spots').select('*').eq('trip_id', trip.id).order('sort_order', { ascending: true }),
+          supabaseClient.from('expenses').select('*').eq('trip_id', trip.id)
+        ]);
+
+        const members = memRes.data || [];
+        const spots = spotRes.data || [];
+        const expenses = expRes.data || [];
+
+        // Fetch splits if any expenses
+        if (expenses.length > 0) {
+          const expIds = expenses.map(e => e.id);
+          const { data: splitsData } = await supabaseClient
+            .from('expense_splits')
+            .select('*')
+            .in('expense_id', expIds);
+
+          const splitsByExp = {};
+          (splitsData || []).forEach(s => {
+            if (!splitsByExp[s.expense_id]) splitsByExp[s.expense_id] = [];
+            splitsByExp[s.expense_id].push(s);
+          });
+          expenses.forEach(e => {
+            e.splits = splitsByExp[e.id] || [];
+          });
+        }
+
+        // Save into local cache
+        saveTripData(trip.id, { trip, members, spots, expenses });
+        const localTrips = getStoredTrips().filter(t => t.id !== trip.id);
+        setStoredTrips([trip, ...localTrips]);
+
+        return trip;
+      } catch (err) {
+        console.error('loadTripFromCloud error:', err);
+        return null;
+      }
+    }
+
+    function subscribeTripRealtime(tripId) {
+      if (!supabaseClient) return;
+      if (activeRealtimeChannel) {
+        try { supabaseClient.removeChannel(activeRealtimeChannel); } catch (e) {}
+      }
+      activeRealtimeChannel = supabaseClient
+        .channel(`trip_realtime_${tripId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', filter: `trip_id=eq.${tripId}` }, async () => {
+          console.log('Realtime change from companion detected! Refreshing...');
+          await loadTripFromCloud(tripId);
+          render();
+        })
+        .subscribe();
+    }
+
+    // --- Navigation Router ---
     function navigate(view, tripId = null) {
       currentView = view;
-      if (tripId) currentTripId = tripId;
+      if (tripId) {
+        currentTripId = tripId;
+        if (isCloudSyncEnabled()) {
+          subscribeTripRealtime(tripId);
+        }
+      }
       closeModal();
       render();
     }
@@ -133,7 +234,7 @@
       headerActions.innerHTML = '';
 
       if (currentView === 'home') {
-        renderHome(container);
+        renderHome(container, headerActions);
       } else if (currentView === 'detail' && currentTripId) {
         renderDetail(container, headerActions);
       }
@@ -141,12 +242,25 @@
     }
 
     // --- 1. Home View ---
-    function renderHome(container) {
+    function renderHome(container, headerActions) {
       const trips = getStoredTrips();
+      const cloudStatus = isCloudSyncEnabled();
+
+      headerActions.innerHTML = `
+        <button onclick="openSupabaseSettingsModal()" class="px-2.5 py-1 ${cloudStatus ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-600 border-slate-200'} border text-xs font-bold rounded-lg flex items-center gap-1 shadow-2xs">
+          <i data-lucide="${cloudStatus ? 'cloud' : 'cloud-off'}" class="w-3.5 h-3.5 ${cloudStatus ? 'text-emerald-600' : 'text-slate-400'}"></i>
+          <span>${cloudStatus ? 'クラウド同期中' : 'クラウド設定'}</span>
+        </button>
+      `;
+
       let html = `
         <div class="mb-5 text-center pt-2">
           <h2 class="text-lg font-black text-slate-800">旅行計画・割り勘マネージャー</h2>
-          <p class="text-xs text-slate-500 mt-0.5">誰が・誰の・何を支払ったかをスマートに管理</p>
+          <p class="text-xs text-slate-500 mt-0.5">誰が・誰の・何を支払ったかをリアルタイム共有＆管理</p>
+          <div class="mt-2 flex items-center justify-center gap-1 text-[11px] font-semibold ${cloudStatus ? 'text-emerald-700' : 'text-slate-400'}">
+            <span class="w-2 h-2 rounded-full ${cloudStatus ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}"></span>
+            ${cloudStatus ? 'Supabase クラウド同期有効（URL共有・同時編集可能）' : 'ローカル保存モード（ヘッダーからクラウド連携可能）'}
+          </div>
         </div>
       `;
 
@@ -194,11 +308,11 @@
           <form onsubmit="handleCreateTrip(event)" class="space-y-3.5 text-xs">
             <div>
               <label class="block font-semibold text-slate-700 mb-1">目的地</label>
-              <input type="text" id="form-dest" required placeholder="例: 京都、金沢、仙台、沖縄、東京" value="京都" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs focus:outline-none focus:border-sky-500">
+              <input type="text" id="form-dest" required placeholder="例: 福井、京都、金沢、仙台、沖縄、東京" value="福井" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs focus:outline-none focus:border-sky-500">
             </div>
             <div>
               <label class="block font-semibold text-slate-700 mb-1">旅行タイトル (任意)</label>
-              <input type="text" id="form-title" placeholder="例: 京都2泊3日旅行" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
+              <input type="text" id="form-title" placeholder="例: 福井・東尋坊ドライブ旅行" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
@@ -215,7 +329,7 @@
             <div>
               <label class="block font-semibold text-slate-700 mb-1 flex items-center justify-between">
                 <span>参加メンバー（割り勘・立替対象）</span>
-                <span class="text-[10px] text-slate-400 font-normal">旅行作成後も追加・変更可能</span>
+                <span class="text-[10px] text-slate-400 font-normal">旅行作成後も追加可能</span>
               </label>
               <div id="creation-members-tags" class="flex flex-wrap gap-1.5 mb-2">
                 ${creationMembers.map((m, idx) => `
@@ -230,7 +344,7 @@
                 `).join('')}
               </div>
               <div class="flex gap-1.5">
-                <input type="text" id="new-member-input" placeholder="メンバー名を追加（例: Aさん、友人）" class="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
+                <input type="text" id="new-member-input" placeholder="メンバー名を追加（例: Aさん）" class="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
                 <button type="button" onclick="addCreationMember()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1 shadow-2xs">
                   <i data-lucide="plus" class="w-3.5 h-3.5"></i> 追加
                 </button>
@@ -239,10 +353,10 @@
 
             <div class="pt-1">
               <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
-                <input type="checkbox" id="form-preset" class="rounded text-sky-600">
+                <input type="checkbox" id="form-preset" checked class="rounded text-sky-600">
                 <div>
-                  <span class="font-bold text-slate-700">主要観光スポットを初期セットする</span>
-                  <div class="text-[10px] text-slate-400">代表スポットを自動で枠組み登録（後から自由に変更可能）</div>
+                  <span class="font-bold text-slate-700">主要観光・交通スポットを初期セットする</span>
+                  <div class="text-[10px] text-slate-400">東京〜敦賀（電車）や敦賀〜東尋坊（車）などの代表枠を自動登録</div>
                 </div>
               </label>
             </div>
@@ -286,13 +400,17 @@
         return;
       }
       const { trip, members, spots, expenses } = data;
+      const cloudStatus = isCloudSyncEnabled();
 
-      // Header Actions
+      // Header Actions: Copy Share URL & Cloud Status
       headerActions.innerHTML = `
-        <button onclick="exportBackup()" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-lg flex items-center gap-1">
-          <i data-lucide="download" class="w-3 h-3"></i> 保存
+        <button onclick="copyShareUrl()" class="px-2.5 py-1 bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold rounded-lg flex items-center gap-1 shadow-2xs transition-colors">
+          <i data-lucide="share-2" class="w-3 h-3"></i> 共有URL
         </button>
-        <button onclick="navigate('home')" class="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold rounded-lg flex items-center gap-1">
+        <button onclick="openSupabaseSettingsModal()" class="px-2 py-1 ${cloudStatus ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'} text-xs font-bold rounded-lg flex items-center gap-1" title="クラウド設定">
+          <i data-lucide="${cloudStatus ? 'cloud' : 'cloud-off'}" class="w-3 h-3 ${cloudStatus ? 'text-emerald-600' : 'text-slate-400'}"></i>
+        </button>
+        <button onclick="navigate('home')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1">
           <i data-lucide="home" class="w-3 h-3"></i> 一覧
         </button>
       `;
@@ -315,22 +433,36 @@
         <!-- Trip Info Card -->
         <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 mb-3">
           <div class="flex items-start justify-between">
-            <h2 class="text-base font-black text-slate-800">${escapeHtml(trip.title)}</h2>
-            <button onclick="openEditTripModal()" class="text-slate-400 hover:text-sky-600 p-1">
-              <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+            <div>
+              <h2 class="text-base font-black text-slate-800">${escapeHtml(trip.title)}</h2>
+              <div class="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-slate-500 font-medium">
+                <span class="text-sky-700 font-bold bg-sky-50 px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <i data-lucide="map-pin" class="w-3 h-3 text-sky-500"></i> ${escapeHtml(trip.destination)}
+                </span>
+                <span class="flex items-center gap-1">
+                  <i data-lucide="calendar" class="w-3 h-3 text-slate-400"></i> ${trip.start_date}〜 (${totalDays}日間)
+                </span>
+                <button onclick="setTab('warikan'); setWarikanSubTab('members')" class="flex items-center gap-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-md font-bold transition-colors">
+                  <i data-lucide="users" class="w-3 h-3 text-emerald-600"></i> ${members.length}名 (管理)
+                </button>
+              </div>
+            </div>
+            <button onclick="copyShareUrl()" class="p-2 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-xl text-xs font-bold flex flex-col items-center gap-0.5 shrink-0" title="同行者に共有リンクを送る">
+              <i data-lucide="share-2" class="w-4 h-4"></i>
+              <span class="text-[9px]">共有</span>
             </button>
           </div>
-          <div class="flex flex-wrap items-center gap-2 mt-2 text-xs text-slate-500 font-medium">
-            <span class="text-sky-700 font-bold bg-sky-50 px-2 py-0.5 rounded-md flex items-center gap-1">
-              <i data-lucide="map-pin" class="w-3 h-3 text-sky-500"></i> ${escapeHtml(trip.destination)}
-            </span>
-            <span class="flex items-center gap-1">
-              <i data-lucide="calendar" class="w-3 h-3 text-slate-400"></i> ${trip.start_date}〜 (${totalDays}日間)
-            </span>
-            <button onclick="setTab('warikan'); setWarikanSubTab('members')" class="flex items-center gap-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-md font-bold transition-colors">
-              <i data-lucide="users" class="w-3 h-3 text-emerald-600"></i> ${members.length}名 (管理)
-            </button>
-          </div>
+          ${cloudStatus ? `
+            <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-emerald-700">
+              <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> リアルタイムクラウド同期中（相手の編集も即時反映）</span>
+              <button onclick="exportBackup()" class="text-slate-400 hover:text-slate-600 text-[10px] flex items-center gap-0.5">JSON保存</button>
+            </div>
+          ` : `
+            <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+              <span>ローカル保存中（端末内のみ）</span>
+              <button onclick="openSupabaseSettingsModal()" class="text-sky-600 font-bold hover:underline">クラウド接続してURL共有</button>
+            </div>
+          `}
         </div>
 
         <!-- Main Tab Switcher -->
@@ -476,7 +608,7 @@
             </div>
           `;
 
-          // If there is a next spot, render a dedicated transit segment connecting this spot to nextSpot!
+          // Transit Segment between spots
           if (nextSpot) {
             const nextMode = spot.travel_mode || 'transit';
             const navNextUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(cleanSpotName)}&destination=${encodeURIComponent(cleanNextSpotName)}&travelmode=${nextMode}`;
@@ -528,6 +660,7 @@
       return html;
     }
 
+    // --- 2-B. Warikan & Expenses Tab ---
     function renderWarikanTab(trip, members, expenses, totalExpense, totalBudget, budgetDiff) {
       const itemizedLendings = calculateItemizedLendings(expenses, members);
       const settlements = calculateOptimalSettlements(expenses, members);
@@ -612,7 +745,7 @@
         }
       }
 
-      // Sub-tab 2: Itemized Lendings (Who paid for whom)
+      // Sub-tab 2: Itemized Lendings
       else if (warikanSubTab === 'lendings') {
         html += `
           <div class="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 p-2.5 rounded-lg mb-2.5">
@@ -647,7 +780,7 @@
         }
       }
 
-      // Sub-tab 3: Final Settlement (Minimal transfers)
+      // Sub-tab 3: Final Settlement
       else if (warikanSubTab === 'settlement') {
         html += `
           <div class="text-xs bg-slate-100 text-slate-600 p-2.5 rounded-lg mb-2.5">
@@ -722,6 +855,193 @@
       const modal = document.getElementById('modal-container');
       modal.classList.add('hidden');
       modal.innerHTML = '';
+    }
+
+    // Supabase Settings Modal
+    function openSupabaseSettingsModal() {
+      const modal = document.getElementById('modal-container');
+      modal.classList.remove('hidden');
+
+      const savedUrl = localStorage.getItem('tabiplan_sb_url') || '';
+      const savedKey = localStorage.getItem('tabiplan_sb_key') || '';
+      const isConnected = isCloudSyncEnabled();
+
+      modal.innerHTML = `
+        <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto text-xs">
+          <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+            <h3 class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+              <i data-lucide="cloud" class="w-4 h-4 text-emerald-600"></i> Supabase クラウド同期設定
+            </h3>
+            <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <p class="text-slate-500 mb-3 leading-relaxed">
+            無料のSupabaseプロジェクトを連携すると、<strong>発行された共有URLを送るだけで、同行者もスマホからリアルタイムに旅程や支出を同時閲覧・編集</strong>できます。
+          </p>
+
+          <form onsubmit="handleSaveSupabaseSettings(event)" class="space-y-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Project URL</label>
+              <input type="text" id="sb-url" required value="${escapeHtml(savedUrl)}" placeholder="https://xyzcompany.supabase.co" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Anon Public Key</label>
+              <input type="password" id="sb-key" required value="${escapeHtml(savedKey)}" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+              <span class="text-[11px] font-bold ${isConnected ? 'text-emerald-700 flex items-center gap-1' : 'text-slate-400'}">
+                ${isConnected ? '<span class="w-2 h-2 rounded-full bg-emerald-500"></span> 接続中' : '未接続'}
+              </span>
+              <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs">
+                保存して接続
+              </button>
+            </div>
+          </form>
+
+          <!-- SQL Setup instructions -->
+          <div class="mt-4 pt-3 border-t border-slate-100">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="font-bold text-slate-700">Supabaseテーブル作成SQL</span>
+              <button type="button" onclick="copySetupSql()" class="text-emerald-700 font-bold hover:underline flex items-center gap-1 text-[11px]">
+                <i data-lucide="copy" class="w-3 h-3"></i> SQLをコピー
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-400 mb-2">
+              Supabaseの「SQL Editor」に貼り付けて「Run」を押すだけで、必要な5つのテーブルと同期権限が一発で作成されます。
+            </p>
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    async function handleSaveSupabaseSettings(e) {
+      e.preventDefault();
+      const url = document.getElementById('sb-url').value.trim();
+      const key = document.getElementById('sb-key').value.trim();
+
+      if (!url || !key) return;
+
+      localStorage.setItem('tabiplan_sb_url', url);
+      localStorage.setItem('tabiplan_sb_key', key);
+
+      const ok = initSupabase();
+      if (!ok) {
+        alert('Supabaseの初期化に失敗しました。URLまたはキーの形式をご確認ください。');
+        return;
+      }
+
+      // Test simple select query
+      try {
+        const { error } = await supabaseClient.from('trips').select('id').limit(1);
+        if (error && !error.message.includes('permission denied')) {
+          console.warn(error);
+          alert(`Supabaseに接続できましたが、テーブルが存在しない可能性があります。\n設定モーダル内の「SQLをコピー」して、SupabaseのSQL Editorで実行してください。\nエラー詳細: ${error.message}`);
+        } else {
+          alert('✅ Supabase クラウド同期に成功しました！\nこれでURL共有によるリアルタイム共同編集が利用できます。');
+        }
+      } catch (err) {
+        alert('接続テスト中にエラーが発生しました: ' + err.message);
+      }
+
+      closeModal();
+      render();
+    }
+
+    function copySetupSql() {
+      const sql = `-- 1. trips テーブル
+CREATE TABLE IF NOT EXISTS trips (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  share_token TEXT UNIQUE DEFAULT gen_random_uuid()::text,
+  title TEXT NOT NULL,
+  destination TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  travel_style TEXT DEFAULT 'standard',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 2. trip_members テーブル
+CREATE TABLE IF NOT EXISTS trip_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  is_creator BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 3. spots テーブル
+CREATE TABLE IF NOT EXISTS spots (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+  day_number INTEGER DEFAULT 1,
+  sort_order INTEGER DEFAULT 0,
+  name TEXT NOT NULL,
+  category TEXT DEFAULT 'sightseeing',
+  memo TEXT DEFAULT '',
+  travel_mode TEXT DEFAULT 'transit',
+  duration_min INTEGER DEFAULT 60,
+  cost_estimate INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 4. expenses テーブル
+CREATE TABLE IF NOT EXISTS expenses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  category TEXT DEFAULT 'food',
+  payer_id TEXT,
+  paid_date TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 5. expense_splits テーブル
+CREATE TABLE IF NOT EXISTS expense_splits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  expense_id UUID REFERENCES expenses(id) ON DELETE CASCADE,
+  member_id TEXT NOT NULL,
+  allocated_amount INTEGER DEFAULT 0
+);
+
+-- RLS (Row Level Security) 設定
+ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trip_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE spots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expense_splits ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public all on trips" ON trips FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public all on trip_members" ON trip_members FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public all on spots" ON spots FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public all on expenses" ON expenses FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public all on expense_splits" ON expense_splits FOR ALL USING (true) WITH CHECK (true);
+
+-- リアルタイム配信の有効化
+ALTER PUBLICATION supabase_realtime ADD TABLE trips, trip_members, spots, expenses, expense_splits;`;
+
+      navigator.clipboard.writeText(sql).then(() => {
+        alert('SQLコードをクリップボードにコピーしました！\nSupabaseの「SQL Editor」を開き、貼り付けて「Run」を実行してください。');
+      });
+    }
+
+    // Share URL Copy
+    function copyShareUrl() {
+      const data = getTripData(currentTripId);
+      if (!data || !data.trip) return;
+
+      const token = data.trip.share_token || data.trip.id;
+      const baseUrl = window.location.origin + window.location.pathname;
+      const shareUrl = `${baseUrl}?trip=${encodeURIComponent(token)}`;
+
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert(`【共有URLをコピーしました】\n同行者の方にこのURLをLINE等で送信してください。\n相手もこのリンクを開くだけで、リアルタイムに同じ旅程・割り勘を閲覧・編集できます！\n\n${shareUrl}`);
+      });
     }
 
     // Rich Modal: Add Expense
@@ -822,7 +1142,7 @@
       boxes.forEach(b => b.checked = checked);
     }
 
-    function handleSaveExpense(e) {
+    async function handleSaveExpense(e) {
       e.preventDefault();
       const title = document.getElementById('exp-title').value.trim();
       const amount = parseInt(document.getElementById('exp-amount').value, 10);
@@ -848,8 +1168,10 @@
       }));
 
       const data = getTripData(currentTripId);
+      const newExpId = crypto.randomUUID ? crypto.randomUUID() : 'exp_' + Date.now();
       const newExp = {
-        id: 'exp_' + Date.now(),
+        id: newExpId,
+        trip_id: currentTripId,
         title,
         amount,
         category,
@@ -859,6 +1181,26 @@
       };
       data.expenses.push(newExp);
       saveTripData(currentTripId, data);
+
+      // Cloud Sync
+      if (isCloudSyncEnabled()) {
+        try {
+          const { splits: sps, ...expRow } = newExp;
+          await supabaseClient.from('expenses').insert([expRow]);
+          if (sps && sps.length > 0) {
+            const splitsRows = sps.map(s => ({
+              id: crypto.randomUUID ? crypto.randomUUID() : 'split_' + Math.random().toString(36).substr(2, 9),
+              expense_id: newExpId,
+              member_id: s.member_id,
+              allocated_amount: s.allocated_amount
+            }));
+            await supabaseClient.from('expense_splits').insert(splitsRows);
+          }
+        } catch (err) {
+          console.error('Cloud expense insert error:', err);
+        }
+      }
+
       closeModal();
       setWarikanSubTab('expenses');
       render();
@@ -883,7 +1225,7 @@
           <form onsubmit="handleSaveSpot(event)" class="space-y-3 text-xs">
             <div>
               <label class="block font-semibold text-slate-700 mb-1">スポット名</label>
-              <input type="text" id="spot-name" required placeholder="例: 清水寺、錦市場、ホテル" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs focus:outline-none focus:border-sky-500">
+              <input type="text" id="spot-name" required placeholder="例: 敦賀駅、東尋坊、ホテル" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-xs focus:outline-none focus:border-sky-500">
             </div>
 
             <div>
@@ -900,7 +1242,7 @@
 
             <div>
               <label class="block font-semibold text-slate-700 mb-1">メモ・見どころ (任意)</label>
-              <input type="text" id="spot-memo" placeholder="例: 舞台からの景色、名物団子" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
+              <input type="text" id="spot-memo" placeholder="例: レンタカー出発、海鮮丼" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
             </div>
 
             <div class="grid grid-cols-2 gap-2">
@@ -917,8 +1259,8 @@
             <div>
               <label class="block font-semibold text-slate-700 mb-1">次のスポットへの移動手段</label>
               <select id="spot-travel-mode" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500">
-                <option value="transit">🚆 電車・新幹線・公共交通</option>
                 <option value="driving">🚗 自動車・レンタカー</option>
+                <option value="transit">🚆 電車・新幹線・公共交通</option>
                 <option value="walking">🚶 徒歩</option>
               </select>
             </div>
@@ -937,7 +1279,7 @@
       lucide.createIcons();
     }
 
-    function handleSaveSpot(e) {
+    async function handleSaveSpot(e) {
       e.preventDefault();
       const name = document.getElementById('spot-name').value.trim();
       const category = document.getElementById('spot-cat').value;
@@ -950,8 +1292,10 @@
       const data = getTripData(currentTripId);
       const daySpots = data.spots.filter(s => s.day_number === activeDay);
 
+      const spotId = crypto.randomUUID ? crypto.randomUUID() : 'spot_' + Date.now();
       const newSpot = {
-        id: 'spot_' + Date.now(),
+        id: spotId,
+        trip_id: currentTripId,
         day_number: activeDay,
         sort_order: daySpots.length,
         name,
@@ -961,8 +1305,18 @@
         cost_estimate: cost,
         travel_mode: travelMode
       };
+
       data.spots.push(newSpot);
       saveTripData(currentTripId, data);
+
+      if (isCloudSyncEnabled()) {
+        try {
+          await supabaseClient.from('spots').insert([newSpot]);
+        } catch (err) {
+          console.error('Cloud spot insert error:', err);
+        }
+      }
+
       closeModal();
       render();
     }
@@ -982,7 +1336,7 @@
     }
 
     // Toggle Travel Mode between spots (transit -> driving -> walking -> transit)
-    function toggleSpotTravelMode(spotId) {
+    async function toggleSpotTravelMode(spotId) {
       const data = getTripData(currentTripId);
       const spot = data.spots.find(s => s.id === spotId);
       if (!spot) return;
@@ -993,11 +1347,17 @@
       else spot.travel_mode = 'transit';
 
       saveTripData(currentTripId, data);
+
+      if (isCloudSyncEnabled()) {
+        try {
+          await supabaseClient.from('spots').update({ travel_mode: spot.travel_mode }).eq('id', spot.id);
+        } catch (e) {}
+      }
       render();
     }
 
     // Spot Controls
-    function moveSpot(spotId, dir) {
+    async function moveSpot(spotId, dir) {
       const data = getTripData(currentTripId);
       const daySpots = data.spots.filter(s => s.day_number === activeDay).sort((a, b) => a.sort_order - b.sort_order);
       const idx = daySpots.findIndex(s => s.id === spotId);
@@ -1011,27 +1371,46 @@
       target.sort_order = idx;
 
       saveTripData(currentTripId, data);
+
+      if (isCloudSyncEnabled()) {
+        try {
+          await supabaseClient.from('spots').update({ sort_order: targetIdx }).eq('id', cur.id);
+          await supabaseClient.from('spots').update({ sort_order: idx }).eq('id', target.id);
+        } catch (e) {}
+      }
       render();
     }
 
-    function deleteSpot(spotId) {
+    async function deleteSpot(spotId) {
       if (!confirm('このスポットを削除しますか？')) return;
       const data = getTripData(currentTripId);
       data.spots = data.spots.filter(s => s.id !== spotId);
       saveTripData(currentTripId, data);
+
+      if (isCloudSyncEnabled()) {
+        try {
+          await supabaseClient.from('spots').delete().eq('id', spotId);
+        } catch (e) {}
+      }
       render();
     }
 
-    function deleteExpense(expId) {
+    async function deleteExpense(expId) {
       if (!confirm('この支出記録を削除しますか？')) return;
       const data = getTripData(currentTripId);
       data.expenses = data.expenses.filter(e => e.id !== expId);
       saveTripData(currentTripId, data);
+
+      if (isCloudSyncEnabled()) {
+        try {
+          await supabaseClient.from('expenses').delete().eq('id', expId);
+        } catch (e) {}
+      }
       render();
     }
 
     // Member Management
-    function handleAddMember(e) {
+    async function handleAddMember(e) {
       e.preventDefault();
       const input = document.getElementById('add-member-name');
       const name = input.value.trim();
@@ -1042,28 +1421,44 @@
         alert('同名のメンバーが既に登録されています。');
         return;
       }
-      data.members.push({
-        id: 'mem_' + Date.now(),
+      const memId = crypto.randomUUID ? crypto.randomUUID() : 'mem_' + Date.now();
+      const newMember = {
+        id: memId,
+        trip_id: currentTripId,
         name,
         is_creator: false
-      });
+      };
+      data.members.push(newMember);
       saveTripData(currentTripId, data);
+
+      if (isCloudSyncEnabled()) {
+        try {
+          await supabaseClient.from('trip_members').insert([newMember]);
+        } catch (e) {}
+      }
+
       input.value = '';
       render();
     }
 
-    function deleteMember(memberId) {
+    async function deleteMember(memberId) {
       const data = getTripData(currentTripId);
       const m = data.members.find(x => x.id === memberId);
       if (!confirm(`「${m?.name}」をメンバーから削除しますか？`)) return;
 
       data.members = data.members.filter(x => x.id !== memberId);
       saveTripData(currentTripId, data);
+
+      if (isCloudSyncEnabled()) {
+        try {
+          await supabaseClient.from('trip_members').delete().eq('id', memberId);
+        } catch (e) {}
+      }
       render();
     }
 
     // Create Trip Handler
-    function handleCreateTrip(e) {
+    async function handleCreateTrip(e) {
       e.preventDefault();
       const dest = document.getElementById('form-dest').value.trim();
       const title = document.getElementById('form-title').value.trim() || `${dest}の旅`;
@@ -1073,16 +1468,33 @@
 
       const memberNames = creationMembers.length > 0 ? creationMembers : ['自分'];
 
-      const tripId = 'trip_' + Date.now();
-      const trip = { id: tripId, title, destination: dest, start_date: start, end_date: end };
-      const members = memberNames.map((name, i) => ({ id: 'mem_' + i + '_' + Date.now(), name, is_creator: i === 0 }));
+      const tripId = crypto.randomUUID ? crypto.randomUUID() : 'trip_' + Date.now();
+      const shareToken = crypto.randomUUID ? crypto.randomUUID() : 'st_' + Date.now();
+
+      const trip = {
+        id: tripId,
+        share_token: shareToken,
+        title,
+        destination: dest,
+        start_date: start,
+        end_date: end,
+        travel_style: 'standard'
+      };
+
+      const members = memberNames.map((name, i) => ({
+        id: crypto.randomUUID ? crypto.randomUUID() : 'mem_' + i + '_' + Date.now(),
+        trip_id: tripId,
+        name,
+        is_creator: i === 0
+      }));
 
       // Spots
       let spots = [];
       if (usePreset) {
-        const cityKey = Object.keys(PRESETS).find(k => dest.includes(k)) || '京都';
+        const cityKey = Object.keys(PRESETS).find(k => dest.includes(k)) || '福井';
         spots = (PRESETS[cityKey] || []).map((s, idx) => ({
-          id: 'spot_' + idx + '_' + Date.now(),
+          id: crypto.randomUUID ? crypto.randomUUID() : 'spot_' + idx + '_' + Date.now(),
+          trip_id: tripId,
           day_number: 1,
           sort_order: idx,
           name: s.name,
@@ -1094,16 +1506,34 @@
         }));
       }
 
+      // Save to local cache
       saveTripData(tripId, { trip, members, spots, expenses: [] });
-
       const trips = getStoredTrips();
       setStoredTrips([trip, ...trips.filter(t => t.id !== tripId)]);
+
+      // Cloud Sync
+      if (isCloudSyncEnabled()) {
+        try {
+          await supabaseClient.from('trips').insert([trip]);
+          if (members.length > 0) await supabaseClient.from('trip_members').insert(members);
+          if (spots.length > 0) await supabaseClient.from('spots').insert(spots);
+        } catch (err) {
+          console.error('Cloud create trip error:', err);
+        }
+      }
 
       navigate('detail', tripId);
     }
 
-    function deleteTrip(id) {
+    async function deleteTrip(id) {
       if (!confirm('この旅行プランを削除しますか？')) return;
+
+      if (isCloudSyncEnabled()) {
+        try {
+          await supabaseClient.from('trips').delete().eq('id', id);
+        } catch (e) {}
+      }
+
       localStorage.removeItem(`trip_${id}`);
       localStorage.removeItem(`members_${id}`);
       localStorage.removeItem(`spots_${id}`);
@@ -1236,12 +1666,6 @@
       }
     }
 
-    function formatMapQuery(spotName, destination) {
-      if (!spotName) return '';
-      if (!destination || spotName.includes(destination)) return spotName;
-      return `${spotName} ${destination}`;
-    }
-
     function escapeHtml(str) {
       if (!str) return '';
       return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1251,8 +1675,38 @@
       return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
     }
 
-    // Initial render
-    render();
-  </script>
+    // --- App Lifecycle & URL Parameter Init ---
+    async function initApp() {
+      initSupabase();
+
+      // Check URL parameters for ?trip=...
+      const urlParams = new URLSearchParams(window.location.search);
+      const tripToken = urlParams.get('trip');
+
+      if (tripToken) {
+        if (isCloudSyncEnabled()) {
+          const cloudTrip = await loadTripFromCloud(tripToken);
+          if (cloudTrip) {
+            navigate('detail', cloudTrip.id);
+            return;
+          }
+        }
+        // Check local
+        const trips = getStoredTrips();
+        const localTrip = trips.find(t => t.id === tripToken || t.share_token === tripToken);
+        if (localTrip) {
+          navigate('detail', localTrip.id);
+          return;
+        } else if (!isCloudSyncEnabled()) {
+          alert('共有された旅行プランを開くには、ヘッダーの「クラウド設定」からSupabaseの接続情報を入力してください。');
+        }
+      }
+
+      render();
+    }
+
+    // Run on load
+    initApp();
+</script>
 </body>
 </html>
